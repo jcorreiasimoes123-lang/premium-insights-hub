@@ -1,10 +1,24 @@
-import { Check, X, Infinity, Clock, BarChart3, Plug, Shield, Headphones } from "lucide-react";
+import { Check, X, Receipt, CreditCard, Clock, BarChart3, Download, Bell } from "lucide-react";
 
 const features = [
   {
+    icon: Receipt,
+    name: "Despesas mensais",
+    free: "50/mês",
+    pro: "Ilimitadas",
+    proHighlight: true,
+  },
+  {
+    icon: CreditCard,
+    name: "Subscrições",
+    free: "5 apps",
+    pro: "Ilimitadas",
+    proHighlight: true,
+  },
+  {
     icon: Clock,
-    name: "Histórico de dados",
-    free: "Últimos 7 dias",
+    name: "Histórico",
+    free: "30 dias",
     pro: "Ilimitado",
     proHighlight: true,
   },
@@ -12,25 +26,18 @@ const features = [
     icon: BarChart3,
     name: "Relatórios",
     free: "Básicos",
-    pro: "Avançados + Exportação",
+    pro: "Avançados + Gráficos",
     proHighlight: true,
   },
   {
-    icon: Plug,
-    name: "Integrações",
-    free: "2 apps",
-    pro: "Ilimitadas",
-    proHighlight: true,
-  },
-  {
-    icon: Shield,
-    name: "Backup automático",
+    icon: Download,
+    name: "Exportação",
     free: false,
     pro: true,
   },
   {
-    icon: Headphones,
-    name: "Suporte prioritário",
+    icon: Bell,
+    name: "Alertas de renovação",
     free: false,
     pro: true,
   },
@@ -40,7 +47,7 @@ export function FeatureComparison() {
   return (
     <div className="w-full">
       <div className="hidden md:grid grid-cols-3 gap-4 mb-4 px-6">
-        <div className="text-sm font-medium text-muted-foreground">Recurso</div>
+        <div className="text-sm font-medium text-muted-foreground">Funcionalidade</div>
         <div className="text-center text-sm font-medium text-muted-foreground">Grátis</div>
         <div className="text-center text-sm font-medium gradient-text">Pro</div>
       </div>

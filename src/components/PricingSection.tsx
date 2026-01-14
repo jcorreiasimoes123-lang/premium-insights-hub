@@ -1,62 +1,61 @@
 import { PricingCard } from "./PricingCard";
 
 const freeFeatures = [
-  { name: "Até 3 projetos", included: true },
-  { name: "Histórico de 7 dias", included: true },
+  { name: "Até 50 despesas/mês", included: true },
+  { name: "5 subscrições", included: true },
+  { name: "Histórico de 30 dias", included: true },
   { name: "Relatórios básicos", included: true },
-  { name: "2 integrações", included: true },
-  { name: "Suporte por email", included: true },
+  { name: "Exportar para CSV", included: false },
   { name: "Histórico ilimitado", included: false },
   { name: "Relatórios avançados", included: false },
-  { name: "Integrações ilimitadas", included: false },
+  { name: "Integrações bancárias", included: false },
 ];
 
 const proFeatures = [
-  { name: "Projetos ilimitados", included: true, highlight: true },
+  { name: "Despesas ilimitadas", included: true, highlight: true },
+  { name: "Subscrições ilimitadas", included: true, highlight: true },
   { name: "Histórico ilimitado", included: true, highlight: true },
-  { name: "Relatórios avançados + exportação", included: true, highlight: true },
-  { name: "Integrações ilimitadas", included: true, highlight: true },
-  { name: "API completa", included: true, highlight: true },
-  { name: "Suporte prioritário 24/7", included: true },
-  { name: "Backup automático", included: true },
-  { name: "SSO & controles de equipe", included: true },
+  { name: "Relatórios avançados + gráficos", included: true, highlight: true },
+  { name: "Exportar PDF, CSV, Excel", included: true },
+  { name: "Integrações bancárias", included: true },
+  { name: "Alertas de renovação", included: true },
+  { name: "Suporte prioritário", included: true },
 ];
 
 export function PricingSection() {
   return (
-    <section id="pricing" className="py-24 bg-background">
+    <section id="planos" className="py-24 bg-background">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Escolha o plano ideal para você
+            Planos simples e transparentes
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Comece grátis e faça upgrade quando precisar de mais poder. 
-            Sem surpresas, cancele quando quiser.
+            Começa grátis e faz upgrade quando precisares de mais funcionalidades.
           </p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           <PricingCard
             title="Grátis"
-            price="Grátis"
-            description="Perfeito para começar e explorar os recursos básicos"
+            price="€0"
+            description="Ideal para quem quer começar a organizar as finanças"
             features={freeFeatures}
             buttonText="Começar Grátis"
           />
           <PricingCard
             title="Pro"
-            price="R$ 49"
-            description="Para equipes que precisam de recursos avançados"
+            price="€4.99"
+            description="Para quem quer controlo total sobre despesas e subscrições"
             features={proFeatures}
             isPro
             popular
-            buttonText="Assinar Pro"
+            buttonText="Experimentar Pro"
           />
         </div>
 
         <p className="text-center text-sm text-muted-foreground mt-8">
-          Todos os planos incluem 14 dias de teste do Pro gratuitamente
+          14 dias de teste gratuito do Pro. Cancela quando quiseres.
         </p>
       </div>
     </section>
