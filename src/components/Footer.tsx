@@ -1,4 +1,4 @@
-import { Zap } from "lucide-react";
+import { Wallet } from "lucide-react";
 
 export function Footer() {
   return (
@@ -7,20 +7,19 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-lg gradient-bg">
-              <Zap className="w-4 h-4 text-primary-foreground" />
+              <Wallet className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="text-lg font-bold">FlowSync</span>
+            <span className="text-lg font-bold">Carteira PT</span>
           </div>
 
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#" className="hover:text-foreground transition-colors">Termos</a>
             <a href="#" className="hover:text-foreground transition-colors">Privacidade</a>
             <a href="#" className="hover:text-foreground transition-colors">Suporte</a>
-            <a href="#" className="hover:text-foreground transition-colors">Contato</a>
           </div>
 
           <p className="text-sm text-muted-foreground">
-            © 2024 FlowSync. Todos os direitos reservados.
+            © 2024 Carteira PT. Feito em Portugal.
           </p>
         </div>
       </div>
