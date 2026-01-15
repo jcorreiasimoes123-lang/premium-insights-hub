@@ -1,19 +1,23 @@
-import { Receipt, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { Receipt } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
+import AddExpenseModal from "@/components/AddExpenseModal";
+import { Toaster } from "@/components/ui/toaster";
 import {
-  mockExpenses,
-  getTotalExpenses,
+  mockExpenses as initialExpenses,
   formatCurrency,
   formatDate,
   categoryColors,
+  type Expense,
 } from "@/data/mockData";
 
 const Despesas = () => {
-  const totalExpenses = getTotalExpenses();
+  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+
+  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
 
   // Agrupar despesas por categoria
-  const expensesByCategory = mockExpenses.reduce((acc, exp) => {
+  const expensesByCategory = expenses.reduce((acc, exp) => {
     if (!acc[exp.category]) {
       acc[exp.category] = { total: 0, count: 0 };
     }
@@ -23,13 +27,22 @@ const Despesas = () => {
   }, {} as Record<string, { total: number; count: number }>);
 
   // Ordenar despesas por data (mais recentes primeiro)
-  const sortedExpenses = [...mockExpenses].sort(
+  const sortedExpenses = [...expenses].sort(
     (a, b) => b.date.getTime() - a.date.getTime()
   );
+
+  const handleAddExpense = (newExpense: Omit<Expense, "id">) => {
+    const expense: Expense = {
+      ...newExpense,
+      id: `exp-${Date.now()}`,
+    };
+    setExpenses((prev) => [...prev, expense]);
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
+      <Toaster />
 
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
@@ -37,10 +50,7 @@ const Despesas = () => {
             <h1 className="text-3xl font-bold mb-2">Despesas</h1>
             <p className="text-muted-foreground">Regista e acompanha os teus gastos</p>
           </div>
-          <Button variant="hero">
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Despesa
-          </Button>
+          <AddExpenseModal onAddExpense={handleAddExpense} />
         </div>
 
         {/* Category Summary */}
