@@ -146,3 +146,24 @@ export const categoryColors: Record<string, string> = {
   "Subscrições": "bg-purple-500/10 text-purple-600",
   "Outros": "bg-slate-500/10 text-slate-600",
 };
+
+// Cores para gráfico (hex)
+export const categoryChartColors: Record<string, string> = {
+  "Alimentação": "#10b981",
+  "Subscrições": "#a855f7",
+  "Outros": "#64748b",
+};
+
+// Agregar despesas por categoria
+export const getExpensesByCategory = (expenses: Expense[] = mockExpenses) => {
+  const grouped = expenses.reduce((acc, exp) => {
+    acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
+    return acc;
+  }, {} as Record<string, number>);
+
+  return Object.entries(grouped).map(([name, value]) => ({
+    name,
+    value: Number(value.toFixed(2)),
+    color: categoryChartColors[name] || "#64748b",
+  }));
+};
