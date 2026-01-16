@@ -22,7 +22,7 @@ import {
 
 const Subscricoes = () => {
   const { toast } = useToast();
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>(initialSubscriptions);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | undefined>();
   const [deletingSubscription, setDeletingSubscription] = useState<Subscription | undefined>();
