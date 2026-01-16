@@ -1,12 +1,36 @@
+import { useState } from "react";
 import { Wallet, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 
 const Registar = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Mock register - redireciona para dashboard
+    toast({
+      title: "Conta criada com sucesso",
+      description: "Bem-vindo à Carteira PT!",
+    });
+    
+    setTimeout(() => {
+      navigate("/dashboard");
+    }, 500);
+  };
+
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center p-4">
+      <Toaster />
       <div className="w-full max-w-md">
         <div className="mb-8">
           <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -26,13 +50,15 @@ const Registar = () => {
           <h1 className="text-2xl font-bold mb-2">Criar conta</h1>
           <p className="text-muted-foreground mb-8">Começa a organizar as tuas finanças</p>
 
-          <form className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nome</Label>
               <Input
                 id="name"
                 type="text"
                 placeholder="O teu nome"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
             </div>
 
@@ -42,6 +68,8 @@ const Registar = () => {
                 id="email"
                 type="email"
                 placeholder="exemplo@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
 
@@ -51,6 +79,8 @@ const Registar = () => {
                 id="password"
                 type="password"
                 placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
             </div>
 

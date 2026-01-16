@@ -162,7 +162,7 @@ const Dashboard = () => {
               </Link>
             </div>
             <div className="divide-y divide-border">
-              {mockSubscriptions.filter((s) => s.active).map((sub) => (
+              {mockSubscriptions.filter((s) => s.status === "active").map((sub) => (
                 <div key={sub.id} className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">

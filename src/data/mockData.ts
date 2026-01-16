@@ -19,9 +19,18 @@ export interface Subscription {
   name: string;
   amount: number;
   renewalDate: Date;
-  active: boolean;
+  status: "active" | "paused";
+  includeInTotal: boolean;
   category: string;
 }
+
+// Categorias de subscrição
+export const subscriptionCategories = [
+  "Entretenimento",
+  "Música",
+  "Produtividade",
+  "Outros",
+] as const;
 
 // Utilizador de teste
 export const mockUser: User = {
@@ -103,7 +112,8 @@ export const mockSubscriptions: Subscription[] = [
     name: "Netflix",
     amount: 15.99,
     renewalDate: getCurrentMonthDate(7),
-    active: true,
+    status: "active",
+    includeInTotal: true,
     category: "Entretenimento",
   },
   {
@@ -111,7 +121,8 @@ export const mockSubscriptions: Subscription[] = [
     name: "Spotify Premium",
     amount: 10.99,
     renewalDate: getCurrentMonthDate(10),
-    active: true,
+    status: "active",
+    includeInTotal: true,
     category: "Música",
   },
 ];
@@ -121,12 +132,14 @@ export const getTotalExpenses = (): number => {
   return mockExpenses.reduce((sum, exp) => sum + exp.amount, 0);
 };
 
-export const getTotalSubscriptions = (): number => {
-  return mockSubscriptions.filter((s) => s.active).reduce((sum, sub) => sum + sub.amount, 0);
+export const getTotalSubscriptions = (subscriptions: Subscription[] = mockSubscriptions): number => {
+  return subscriptions
+    .filter((s) => s.status === "active" && s.includeInTotal)
+    .reduce((sum, sub) => sum + sub.amount, 0);
 };
 
-export const getActiveSubscriptionsCount = (): number => {
-  return mockSubscriptions.filter((s) => s.active).length;
+export const getActiveSubscriptionsCount = (subscriptions: Subscription[] = mockSubscriptions): number => {
+  return subscriptions.filter((s) => s.status === "active").length;
 };
 
 export const formatCurrency = (value: number): string => {
