@@ -12,7 +12,7 @@ import {
 } from "@/data/mockData";
 
 const Despesas = () => {
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
 
