@@ -1,12 +1,17 @@
 import { Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { mockUser } from "@/data/mockData";
 
 const AppHeader = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   
   const isActive = (path: string) => location.pathname === path;
+
+  const handleLogout = () => {
+    navigate("/login");
+  };
 
   return (
     <header className="border-b border-border bg-card">
@@ -53,7 +58,7 @@ const AppHeader = () => {
 
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">{mockUser.name}</span>
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
             Sair
           </Button>
         </div>
