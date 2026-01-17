@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CreditCard, Plus, Calendar, CheckCircle, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,12 +13,13 @@ import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import {
-  mockSubscriptions as initialSubscriptions,
   getTotalSubscriptions,
   formatCurrency,
   formatDate,
   type Subscription,
 } from "@/data/mockData";
+
+const SUBSCRIPTIONS_KEY = "carteira-pt-subscriptions";
 
 const Subscricoes = () => {
   const { toast } = useToast();
@@ -26,6 +27,20 @@ const Subscricoes = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<Subscription | undefined>();
   const [deletingSubscription, setDeletingSubscription] = useState<Subscription | undefined>();
+
+  // Carregar do localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(SUBSCRIPTIONS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      setSubscriptions(parsed.map((s: any) => ({ ...s, renewalDate: new Date(s.renewalDate) })));
+    }
+  }, []);
+
+  // Guardar no localStorage
+  useEffect(() => {
+    localStorage.setItem(SUBSCRIPTIONS_KEY, JSON.stringify(subscriptions));
+  }, [subscriptions]);
 
   const totalSubscriptions = getTotalSubscriptions(subscriptions);
   const activeCount = subscriptions.filter((s) => s.status === "active").length;
