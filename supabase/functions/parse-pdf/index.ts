@@ -74,9 +74,10 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `És um extrator de transações bancárias. 
+            content: `És um extrator de transações bancárias portuguesas. 
 REGRA ABSOLUTA: Extrai APENAS dados que EXISTEM LITERALMENTE no documento.
 NUNCA inventes, estimes ou adivinhas valores ou descrições.
+DISTINGUE entre DESPESAS (débitos/saídas) e RECEITAS (créditos/entradas).
 Se não vires dados claros, responde com array vazio [].`
           },
           {
@@ -84,7 +85,7 @@ Se não vires dados claros, responde com array vazio [].`
             content: [
               {
                 type: "text",
-                text: `Analisa este documento e extrai APENAS as transações/movimentos bancários que vês CLARAMENTE escritos.
+                text: `Analisa este extrato bancário e extrai APENAS as transações que vês CLARAMENTE escritas.
 
 REGRAS CRÍTICAS:
 1. Extrai APENAS transações que EXISTEM no documento - NUNCA inventes
@@ -94,15 +95,32 @@ REGRAS CRÍTICAS:
 5. Valores devem ser os EXATOS do documento (não arredondes nem estimes)
 6. Máximo 50 transações
 
+DISTINGUIR TIPO DE TRANSAÇÃO:
+- type: "expense" para DÉBITOS/SAÍDAS (compras, pagamentos, transferências enviadas, levantamentos)
+- type: "income" para CRÉDITOS/ENTRADAS (salário, transferências recebidas, depósitos, reembolsos)
+
+Indicadores de DESPESA (expense):
+- Valores com sinal negativo (-)
+- Palavras: "Compra", "Pagamento", "Débito", "Levantamento", "TPA", "MB WAY enviado"
+- Supermercados, lojas, restaurantes, serviços
+
+Indicadores de RECEITA (income):
+- Valores com sinal positivo (+)
+- Palavras: "Transferência recebida", "Crédito", "Ordenado", "Salário", "Depósito", "Reembolso"
+- Transferências de outras contas para esta
+
 Para cada transação REAL que encontres:
 - description: texto EXATO da descrição (máx 60 caracteres)
-- amount: valor EXATO numérico positivo
+- amount: valor EXATO numérico positivo (sempre positivo, o type indica se é saída ou entrada)
 - date: data no formato YYYY-MM-DD
+- type: "expense" ou "income"
+- category: categoria apropriada
 
-Categorias possíveis: "Alimentação", "Transporte", "Subscrições", "Saúde", "Lazer", "Compras", "Habitação", "Outros"
+Categorias para DESPESAS: "Alimentação", "Transporte", "Subscrições", "Saúde", "Lazer", "Compras", "Habitação", "Outros"
+Categorias para RECEITAS: "Salário", "Freelance", "Investimentos", "Reembolso", "Transferência", "Outros"
 
 Responde APENAS com JSON array válido, sem markdown nem explicações:
-[{"description":"TEXTO EXATO","amount":12.34,"date":"2024-01-15","category":"Outros"}]
+[{"description":"TEXTO EXATO","amount":12.34,"date":"2024-01-15","type":"expense","category":"Outros"}]
 
 Se não encontrares transações claras, responde apenas: []`
               },
@@ -188,6 +206,9 @@ Se não encontrares transações claras, responde apenas: []`
         transactions = JSON.parse(cleanContent);
       }
       
+      const expenseCategories = ["Alimentação", "Transporte", "Subscrições", "Saúde", "Lazer", "Compras", "Habitação", "Outros"];
+      const incomeCategories = ["Salário", "Freelance", "Investimentos", "Reembolso", "Transferência", "Outros"];
+      
       // Validate and normalize transactions
       transactions = transactions
         .filter((t: any) => {
@@ -208,14 +229,24 @@ Se não encontrares transações claras, responde apenas: []`
             }
           }
           
+          // Determine transaction type (default to expense if not specified)
+          const type = t.type === "income" ? "income" : "expense";
+          
+          // Validate category based on type
+          let category = t.category;
+          if (type === "expense") {
+            category = expenseCategories.includes(category) ? category : "Outros";
+          } else {
+            category = incomeCategories.includes(category) ? category : "Outros";
+          }
+          
           return {
             id: `import-${Date.now()}-${index}`,
             description: String(t.description).trim().substring(0, 100),
             amount: Math.abs(Number(t.amount)),
             date: date,
-            category: ["Alimentação", "Transporte", "Subscrições", "Saúde", "Lazer", "Compras", "Habitação", "Outros"].includes(t.category) 
-              ? t.category 
-              : "Outros",
+            type: type,
+            category: category,
             selected: true,
           };
         })
@@ -226,14 +257,19 @@ Se não encontrares transações claras, responde apenas: []`
       transactions = [];
     }
 
-    console.log(`Extraídas ${transactions.length} transações válidas`);
+    const expenseCount = transactions.filter((t: any) => t.type === "expense").length;
+    const incomeCount = transactions.filter((t: any) => t.type === "income").length;
+    
+    console.log(`Extraídas ${transactions.length} transações válidas (${expenseCount} despesas, ${incomeCount} receitas)`);
 
     return new Response(
       JSON.stringify({ 
         transactions,
         fileName: file.name,
+        expenseCount,
+        incomeCount,
         message: transactions.length > 0 
-          ? `Encontradas ${transactions.length} transações no extrato` 
+          ? `Encontradas ${transactions.length} transações: ${expenseCount} despesa(s) e ${incomeCount} receita(s)` 
           : "Não foram encontradas transações. O ficheiro pode não conter um extrato bancário válido ou o formato não é suportado."
       }),
       { 

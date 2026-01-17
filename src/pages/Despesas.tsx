@@ -25,9 +25,11 @@ import {
   formatDate,
   getCategoryBadgeClass,
   type Expense,
+  type Income,
 } from "@/data/mockData";
 
 const EXPENSES_KEY = "carteira-pt-expenses";
+const INCOMES_KEY = "carteira-pt-incomes";
 
 const Despesas = () => {
   const { toast } = useToast();
@@ -139,15 +141,38 @@ const Despesas = () => {
     setIsClearAllDialogOpen(false);
   };
 
-  const handleImportExpenses = (newExpenses: Omit<Expense, "id">[]) => {
-    const expensesWithIds: Expense[] = newExpenses.map((exp, index) => ({
-      ...exp,
-      id: `exp-import-${Date.now()}-${index}`,
-    }));
-    setExpenses((prev) => [...prev, ...expensesWithIds]);
+  const handleImportExpenses = (newExpenses: Omit<Expense, "id">[], newIncomes: Omit<Income, "id">[]) => {
+    // Importar despesas
+    if (newExpenses.length > 0) {
+      const expensesWithIds: Expense[] = newExpenses.map((exp, index) => ({
+        ...exp,
+        id: `exp-import-${Date.now()}-${index}`,
+      }));
+      setExpenses((prev) => [...prev, ...expensesWithIds]);
+    }
+    
+    // Guardar receitas no localStorage (serão usadas no Dashboard/página de Receitas)
+    if (newIncomes.length > 0) {
+      const savedIncomes = localStorage.getItem(INCOMES_KEY);
+      const existingIncomes: Income[] = savedIncomes 
+        ? JSON.parse(savedIncomes).map((i: any) => ({ ...i, date: new Date(i.date) }))
+        : [];
+      
+      const incomesWithIds: Income[] = newIncomes.map((inc, index) => ({
+        ...inc,
+        id: `inc-import-${Date.now()}-${index}`,
+      }));
+      
+      localStorage.setItem(INCOMES_KEY, JSON.stringify([...existingIncomes, ...incomesWithIds]));
+    }
+    
+    const parts = [];
+    if (newExpenses.length > 0) parts.push(`${newExpenses.length} despesa(s)`);
+    if (newIncomes.length > 0) parts.push(`${newIncomes.length} receita(s)`);
+    
     toast({
-      title: "Despesas importadas",
-      description: `${newExpenses.length} despesa(s) importada(s) com sucesso.`,
+      title: "Transações importadas",
+      description: `${parts.join(" e ")} importada(s) com sucesso.`,
     });
   };
 
