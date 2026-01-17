@@ -1,5 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
-import { Receipt, MoreVertical, Pencil, Trash2, Eraser, Filter } from "lucide-react";
+import {
+  Receipt,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Eraser,
+  Filter,
+  Plus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -40,7 +48,6 @@ const Despesas = () => {
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("todas");
 
-  // Carregar do localStorage
   useEffect(() => {
     const saved = localStorage.getItem(EXPENSES_KEY);
     if (saved) {
@@ -49,12 +56,10 @@ const Despesas = () => {
     }
   }, []);
 
-  // Guardar no localStorage
   useEffect(() => {
     localStorage.setItem(EXPENSES_KEY, JSON.stringify(expenses));
   }, [expenses]);
 
-  // Obter lista única de categorias
   const categories = useMemo(() => {
     const cats = [...new Set(expenses.map((e) => e.category))];
     return cats.sort();
@@ -62,7 +67,6 @@ const Despesas = () => {
 
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
 
-  // Agrupar despesas por categoria
   const expensesByCategory = expenses.reduce((acc, exp) => {
     if (!acc[exp.category]) {
       acc[exp.category] = { total: 0, count: 0 };
@@ -72,7 +76,6 @@ const Despesas = () => {
     return acc;
   }, {} as Record<string, { total: number; count: number }>);
 
-  // Filtrar e ordenar despesas
   const filteredExpenses = useMemo(() => {
     let filtered = [...expenses];
     if (selectedCategory !== "todas") {
@@ -141,8 +144,10 @@ const Despesas = () => {
     setIsClearAllDialogOpen(false);
   };
 
-  const handleImportExpenses = (newExpenses: Omit<Expense, "id">[], newIncomes: Omit<Income, "id">[]) => {
-    // Importar despesas
+  const handleImportExpenses = (
+    newExpenses: Omit<Expense, "id">[],
+    newIncomes: Omit<Income, "id">[]
+  ) => {
     if (newExpenses.length > 0) {
       const expensesWithIds: Expense[] = newExpenses.map((exp, index) => ({
         ...exp,
@@ -150,26 +155,31 @@ const Despesas = () => {
       }));
       setExpenses((prev) => [...prev, ...expensesWithIds]);
     }
-    
-    // Guardar receitas no localStorage (serão usadas no Dashboard/página de Receitas)
+
     if (newIncomes.length > 0) {
       const savedIncomes = localStorage.getItem(INCOMES_KEY);
-      const existingIncomes: Income[] = savedIncomes 
-        ? JSON.parse(savedIncomes).map((i: any) => ({ ...i, date: new Date(i.date) }))
+      const existingIncomes: Income[] = savedIncomes
+        ? JSON.parse(savedIncomes).map((i: any) => ({
+            ...i,
+            date: new Date(i.date),
+          }))
         : [];
-      
+
       const incomesWithIds: Income[] = newIncomes.map((inc, index) => ({
         ...inc,
         id: `inc-import-${Date.now()}-${index}`,
       }));
-      
-      localStorage.setItem(INCOMES_KEY, JSON.stringify([...existingIncomes, ...incomesWithIds]));
+
+      localStorage.setItem(
+        INCOMES_KEY,
+        JSON.stringify([...existingIncomes, ...incomesWithIds])
+      );
     }
-    
+
     const parts = [];
     if (newExpenses.length > 0) parts.push(`${newExpenses.length} despesa(s)`);
     if (newIncomes.length > 0) parts.push(`${newIncomes.length} receita(s)`);
-    
+
     toast({
       title: "Transações importadas",
       description: `${parts.join(" e ")} importada(s) com sucesso.`,
@@ -181,22 +191,29 @@ const Despesas = () => {
       <AppHeader />
       <Toaster />
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+      <main className="container mx-auto px-4 py-6">
+        {/* Page Header */}
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Despesas</h1>
-            <p className="text-muted-foreground">Regista e acompanha os teus gastos</p>
+            <h1>Despesas</h1>
+            <p className="text-muted-foreground mt-1">
+              Regista e acompanha os teus gastos
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {expenses.length > 0 && (
-              <Button variant="outline" onClick={() => setIsClearAllDialogOpen(true)}>
-                <Eraser className="w-4 h-4 mr-2" />
-                Limpar Tudo
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsClearAllDialogOpen(true)}
+              >
+                <Eraser className="w-4 h-4 mr-1.5" />
+                Limpar
               </Button>
             )}
             <ImportPdfModal onImport={handleImportExpenses} />
-            <Button variant="hero" onClick={handleOpenNewModal}>
-              <Receipt className="w-4 h-4 mr-2" />
+            <Button onClick={handleOpenNewModal}>
+              <Plus className="w-4 h-4 mr-1.5" />
               Nova Despesa
             </Button>
           </div>
@@ -204,53 +221,66 @@ const Despesas = () => {
 
         {/* Category Summary */}
         {Object.keys(expensesByCategory).length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            {Object.entries(expensesByCategory).map(([category, data]) => (
-              <div key={category} className="bg-card rounded-xl p-4 border border-border">
-                <div className="flex items-center justify-between">
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${getCategoryBadgeClass(category)}`}>
-                    {category}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{data.count} itens</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            {Object.entries(expensesByCategory)
+              .sort(([, a], [, b]) => b.total - a.total)
+              .slice(0, 4)
+              .map(([category, data]) => (
+                <div key={category} className="stat-card p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span
+                      className={`badge-base text-[10px] ${getCategoryBadgeClass(
+                        category
+                      )}`}
+                    >
+                      {category}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {data.count}
+                    </span>
+                  </div>
+                  <p className="text-lg font-bold">{formatCurrency(data.total)}</p>
                 </div>
-                <p className="text-2xl font-bold mt-3">{formatCurrency(data.total)}</p>
-              </div>
-            ))}
+              ))}
           </div>
         )}
 
         {/* Total */}
-        <div className="bg-card rounded-xl p-6 border border-border mb-6">
+        <div className="stat-card mb-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Receipt className="w-5 h-5 text-primary" />
+            <div className="flex items-center gap-2.5">
+              <div className="icon-container-sm bg-primary/10">
+                <Receipt className="w-4 h-4 text-primary" />
               </div>
-              <span className="text-muted-foreground">Total de despesas este mês</span>
+              <span className="text-muted-foreground">
+                Total de despesas este mês
+              </span>
             </div>
-            <span className="text-2xl font-bold">{formatCurrency(totalExpenses)}</span>
+            <span className="stat-value">{formatCurrency(totalExpenses)}</span>
           </div>
         </div>
 
         {/* Expenses List */}
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-4">
+        <div className="card-base overflow-hidden">
+          <div className="section-header flex-wrap gap-3">
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold">
-                {selectedCategory === "todas" ? "Todas as Despesas" : `Despesas: ${selectedCategory}`}
+              <h2>
+                {selectedCategory === "todas"
+                  ? "Todas as Despesas"
+                  : `Despesas: ${selectedCategory}`}
               </h2>
               <span className="text-sm text-muted-foreground">
-                ({filteredExpenses.length} {filteredExpenses.length === 1 ? "item" : "itens"} · {formatCurrency(filteredTotal)})
+                ({filteredExpenses.length} · {formatCurrency(filteredTotal)})
               </span>
             </div>
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-muted-foreground" />
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filtrar por categoria" />
+                <SelectTrigger className="w-[160px] h-8">
+                  <SelectValue placeholder="Filtrar" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todas">Todas as categorias</SelectItem>
+                  <SelectItem value="todas">Todas</SelectItem>
                   {categories.map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat} ({expensesByCategory[cat]?.count || 0})
@@ -262,39 +292,55 @@ const Despesas = () => {
           </div>
           <div className="divide-y divide-border">
             {filteredExpenses.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                <Receipt className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <div className="p-12 text-center">
+                <div className="icon-container-lg bg-muted mx-auto mb-4">
+                  <Receipt className="w-6 h-6 text-muted-foreground" />
+                </div>
                 {expenses.length === 0 ? (
                   <>
-                    <p>Ainda não tens despesas.</p>
-                    <p className="text-sm">Adiciona manualmente ou importa um extrato bancário.</p>
+                    <p className="font-medium mb-1">Ainda não tens despesas.</p>
+                    <p className="text-sm text-muted-foreground">
+                      Adiciona manualmente ou importa um extrato.
+                    </p>
                   </>
                 ) : (
                   <>
-                    <p>Nenhuma despesa em "{selectedCategory}".</p>
-                    <Button variant="link" onClick={() => setSelectedCategory("todas")}>
-                      Ver todas as despesas
+                    <p className="font-medium mb-1">
+                      Nenhuma despesa em "{selectedCategory}".
+                    </p>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={() => setSelectedCategory("todas")}
+                    >
+                      Ver todas
                     </Button>
                   </>
                 )}
               </div>
             ) : (
               filteredExpenses.map((expense) => (
-                <div key={expense.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                      <Receipt className="w-5 h-5 text-muted-foreground" />
+                <div key={expense.id} className="list-item-interactive">
+                  <div className="flex items-center gap-3">
+                    <div className="icon-container-sm bg-muted">
+                      <Receipt className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="font-medium">{expense.description}</p>
-                      <p className="text-sm text-muted-foreground">{formatDate(new Date(expense.date))}</p>
+                      <p className="font-medium text-sm">{expense.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(new Date(expense.date))}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${getCategoryBadgeClass(expense.category)}`}>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`badge-base ${getCategoryBadgeClass(
+                        expense.category
+                      )}`}
+                    >
                       {expense.category}
                     </span>
-                    <span className="font-semibold min-w-[80px] text-right">
+                    <span className="font-semibold min-w-[70px] text-right">
                       {formatCurrency(expense.amount)}
                     </span>
                     <DropdownMenu>
@@ -304,7 +350,9 @@ const Despesas = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenEditModal(expense)}>
+                        <DropdownMenuItem
+                          onClick={() => handleOpenEditModal(expense)}
+                        >
                           <Pencil className="w-4 h-4 mr-2" />
                           Editar
                         </DropdownMenuItem>
@@ -325,7 +373,6 @@ const Despesas = () => {
         </div>
       </main>
 
-      {/* Modal para criar/editar */}
       <ExpenseModal
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
@@ -333,7 +380,6 @@ const Despesas = () => {
         onSave={handleSaveExpense}
       />
 
-      {/* Dialog de confirmação para eliminar */}
       <DeleteConfirmDialog
         open={!!deletingExpense}
         onConfirm={handleDeleteExpense}
@@ -342,7 +388,6 @@ const Despesas = () => {
         description={`Tens a certeza que queres eliminar "${deletingExpense?.description}"? Esta ação não pode ser desfeita.`}
       />
 
-      {/* Dialog de confirmação para limpar tudo */}
       <DeleteConfirmDialog
         open={isClearAllDialogOpen}
         onConfirm={handleClearAllExpenses}

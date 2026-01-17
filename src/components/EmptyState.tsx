@@ -10,20 +10,22 @@ interface EmptyStateProps {
   actionLink?: string;
 }
 
-const EmptyState = ({ 
-  icon: Icon, 
-  title, 
-  description, 
-  actionLabel, 
-  actionLink 
+const EmptyState = ({
+  icon: Icon,
+  title,
+  description,
+  actionLabel,
+  actionLink,
 }: EmptyStateProps) => {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="p-4 rounded-full bg-muted mb-4">
-        <Icon className="w-8 h-8 text-muted-foreground" />
+    <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+      <div className="icon-container-lg bg-muted mb-5">
+        <Icon className="w-6 h-6 text-muted-foreground" />
       </div>
-      <h3 className="font-semibold text-lg mb-2">{title}</h3>
-      <p className="text-muted-foreground text-sm max-w-xs mb-4">{description}</p>
+      <h3 className="font-semibold mb-1.5">{title}</h3>
+      <p className="text-sm text-muted-foreground max-w-[280px] mb-5">
+        {description}
+      </p>
       {actionLabel && actionLink && (
         <Link to={actionLink}>
           <Button variant="outline" size="sm">
