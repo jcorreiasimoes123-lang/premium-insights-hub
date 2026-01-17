@@ -70,31 +70,41 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [
+          {
+            role: "system",
+            content: `És um extrator de transações bancárias. 
+REGRA ABSOLUTA: Extrai APENAS dados que EXISTEM LITERALMENTE no documento.
+NUNCA inventes, estimes ou adivinhas valores ou descrições.
+Se não vires dados claros, responde com array vazio [].`
+          },
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: `Analisa este extrato bancário português e extrai as transações/movimentos que vês.
+                text: `Analisa este documento e extrai APENAS as transações/movimentos bancários que vês CLARAMENTE escritos.
 
-REGRAS:
-1. Extrai APENAS transações reais do documento
-2. NUNCA inventes transações
-3. Se não vires transações claras, responde []
-4. Máximo 50 transações (as mais recentes)
-5. Valores sempre positivos
+REGRAS CRÍTICAS:
+1. Extrai APENAS transações que EXISTEM no documento - NUNCA inventes
+2. Cada transação DEVE ter descrição, valor e data VISÍVEIS no documento
+3. Se o documento estiver ilegível, mal formatado ou vazio: responde []
+4. Se não tiveres 100% certeza sobre um valor: NÃO incluas essa transação
+5. Valores devem ser os EXATOS do documento (não arredondes nem estimes)
+6. Máximo 50 transações
 
-Para cada transação:
-- description: texto da descrição (máx 60 caracteres)
-- amount: valor numérico positivo
-- date: data YYYY-MM-DD
+Para cada transação REAL que encontres:
+- description: texto EXATO da descrição (máx 60 caracteres)
+- amount: valor EXATO numérico positivo
+- date: data no formato YYYY-MM-DD
 
-Categorias: "Alimentação", "Transporte", "Subscrições", "Saúde", "Lazer", "Compras", "Habitação", "Outros"
+Categorias possíveis: "Alimentação", "Transporte", "Subscrições", "Saúde", "Lazer", "Compras", "Habitação", "Outros"
 
-Responde APENAS com JSON array compacto, sem markdown:
-[{"description":"TEXTO","amount":12.34,"date":"2024-01-15","category":"Outros"}]`
+Responde APENAS com JSON array válido, sem markdown nem explicações:
+[{"description":"TEXTO EXATO","amount":12.34,"date":"2024-01-15","category":"Outros"}]
+
+Se não encontrares transações claras, responde apenas: []`
               },
               {
                 type: "image_url",
