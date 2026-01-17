@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
-import { CreditCard, Plus, Calendar, CheckCircle, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import {
+  CreditCard,
+  Plus,
+  Calendar,
+  CheckCircle,
+  MoreVertical,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,19 +33,23 @@ const Subscricoes = () => {
   const { toast } = useToast();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingSubscription, setEditingSubscription] = useState<Subscription | undefined>();
-  const [deletingSubscription, setDeletingSubscription] = useState<Subscription | undefined>();
+  const [editingSubscription, setEditingSubscription] = useState<
+    Subscription | undefined
+  >();
+  const [deletingSubscription, setDeletingSubscription] = useState<
+    Subscription | undefined
+  >();
 
-  // Carregar do localStorage
   useEffect(() => {
     const saved = localStorage.getItem(SUBSCRIPTIONS_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      setSubscriptions(parsed.map((s: any) => ({ ...s, renewalDate: new Date(s.renewalDate) })));
+      setSubscriptions(
+        parsed.map((s: any) => ({ ...s, renewalDate: new Date(s.renewalDate) }))
+      );
     }
   }, []);
 
-  // Guardar no localStorage
   useEffect(() => {
     localStorage.setItem(SUBSCRIPTIONS_KEY, JSON.stringify(subscriptions));
   }, [subscriptions]);
@@ -57,7 +69,6 @@ const Subscricoes = () => {
 
   const handleSaveSubscription = (data: Omit<Subscription, "id">) => {
     if (editingSubscription) {
-      // Editar existente
       setSubscriptions((prev) =>
         prev.map((s) =>
           s.id === editingSubscription.id ? { ...data, id: s.id } : s
@@ -68,7 +79,6 @@ const Subscricoes = () => {
         description: `"${data.name}" foi atualizada com sucesso.`,
       });
     } else {
-      // Criar nova
       const newSubscription: Subscription = {
         ...data,
         id: `sub-${Date.now()}`,
@@ -84,8 +94,10 @@ const Subscricoes = () => {
 
   const handleDeleteSubscription = () => {
     if (!deletingSubscription) return;
-    
-    setSubscriptions((prev) => prev.filter((s) => s.id !== deletingSubscription.id));
+
+    setSubscriptions((prev) =>
+      prev.filter((s) => s.id !== deletingSubscription.id)
+    );
     toast({
       title: "Subscrição eliminada",
       description: `"${deletingSubscription.name}" foi eliminada.`,
@@ -99,79 +111,96 @@ const Subscricoes = () => {
       <AppHeader />
       <Toaster />
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
+      <main className="container mx-auto px-4 py-6">
+        {/* Page Header */}
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Subscrições</h1>
-            <p className="text-muted-foreground">Gere as tuas subscrições SaaS e serviços</p>
+            <h1>Subscrições</h1>
+            <p className="text-muted-foreground mt-1">
+              Gere as tuas subscrições SaaS e serviços
+            </p>
           </div>
-          <Button variant="hero" onClick={handleOpenNewModal}>
-            <Plus className="w-4 h-4 mr-2" />
+          <Button onClick={handleOpenNewModal}>
+            <Plus className="w-4 h-4 mr-1.5" />
             Nova Subscrição
           </Button>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-card rounded-xl p-6 border border-border">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 rounded-lg bg-accent/10">
-                <CreditCard className="w-5 h-5 text-accent" />
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="stat-card">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div
+                className="icon-container-sm"
+                style={{ background: "hsl(var(--accent) / 0.1)" }}
+              >
+                <CreditCard
+                  className="w-4 h-4"
+                  style={{ color: "hsl(var(--accent))" }}
+                />
               </div>
-              <span className="text-muted-foreground">Custo mensal total</span>
+              <span className="stat-label">Custo mensal total</span>
             </div>
-            <p className="text-3xl font-bold">{formatCurrency(totalSubscriptions)}</p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="stat-value">{formatCurrency(totalSubscriptions)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
               {formatCurrency(totalSubscriptions * 12)} /ano
             </p>
           </div>
 
-          <div className="bg-card rounded-xl p-6 border border-border">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 rounded-lg bg-emerald-500/10">
-                <CheckCircle className="w-5 h-5 text-emerald-500" />
+          <div className="stat-card">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div
+                className="icon-container-sm"
+                style={{ background: "hsl(var(--success) / 0.1)" }}
+              >
+                <CheckCircle
+                  className="w-4 h-4"
+                  style={{ color: "hsl(var(--success))" }}
+                />
               </div>
-              <span className="text-muted-foreground">Subscrições ativas</span>
+              <span className="stat-label">Subscrições ativas</span>
             </div>
-            <p className="text-3xl font-bold">{activeCount}</p>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="stat-value">{activeCount}</p>
+            <p className="text-xs text-muted-foreground mt-1">
               de {subscriptions.length} total
             </p>
           </div>
         </div>
 
         {/* Subscriptions List */}
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="p-4 border-b border-border">
-            <h2 className="font-semibold">As tuas Subscrições</h2>
+        <div className="card-base overflow-hidden">
+          <div className="section-header">
+            <h2>As tuas Subscrições</h2>
           </div>
           <div className="divide-y divide-border">
             {subscriptions.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                <CreditCard className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Ainda não tens subscrições.</p>
-                <p className="text-sm">Clica em "Nova Subscrição" para começar.</p>
+              <div className="p-12 text-center">
+                <div className="icon-container-lg bg-muted mx-auto mb-4">
+                  <CreditCard className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="font-medium mb-1">Ainda não tens subscrições.</p>
+                <p className="text-sm text-muted-foreground">
+                  Clica em "Nova Subscrição" para começar.
+                </p>
               </div>
             ) : (
               subscriptions.map((subscription) => (
-                <div key={subscription.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-                      <CreditCard className="w-6 h-6 text-primary" />
+                <div key={subscription.id} className="list-item-interactive">
+                  <div className="flex items-center gap-3">
+                    <div className="icon-container-md bg-primary/10">
+                      <CreditCard className="w-5 h-5 text-primary" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold">{subscription.name}</p>
+                        <p className="font-medium">{subscription.name}</p>
                         {subscription.includeInTotal && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                          <span className="badge-primary text-[10px]">
                             Incluído no total
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                          {subscription.category}
-                        </span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="badge-muted">{subscription.category}</span>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Calendar className="w-3 h-3" />
                           <span>Renova {formatDate(subscription.renewalDate)}</span>
@@ -179,18 +208,16 @@ const Subscricoes = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                     {subscription.status === "active" ? (
-                      <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 font-medium">
-                        Ativa
-                      </span>
+                      <span className="badge-success">Ativa</span>
                     ) : (
-                      <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground font-medium">
-                        Pausada
-                      </span>
+                      <span className="badge-muted">Pausada</span>
                     )}
-                    <div className="text-right min-w-[100px]">
-                      <span className="font-bold text-lg">{formatCurrency(subscription.amount)}</span>
+                    <div className="text-right min-w-[90px]">
+                      <span className="font-bold">
+                        {formatCurrency(subscription.amount)}
+                      </span>
                       <p className="text-xs text-muted-foreground">/mês</p>
                     </div>
                     <DropdownMenu>
@@ -200,7 +227,9 @@ const Subscricoes = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenEditModal(subscription)}>
+                        <DropdownMenuItem
+                          onClick={() => handleOpenEditModal(subscription)}
+                        >
                           <Pencil className="w-4 h-4 mr-2" />
                           Editar
                         </DropdownMenuItem>
@@ -221,7 +250,6 @@ const Subscricoes = () => {
         </div>
       </main>
 
-      {/* Modal para criar/editar */}
       <SubscriptionModal
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
@@ -229,7 +257,6 @@ const Subscricoes = () => {
         onSave={handleSaveSubscription}
       />
 
-      {/* Dialog de confirmação para eliminar */}
       <DeleteConfirmDialog
         open={!!deletingSubscription}
         onConfirm={handleDeleteSubscription}
