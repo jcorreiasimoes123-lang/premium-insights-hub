@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   formatCurrency,
   formatDate,
-  categoryColors,
+  getCategoryBadgeClass,
   type Expense,
 } from "@/data/mockData";
 
@@ -161,7 +161,7 @@ const Despesas = () => {
             {Object.entries(expensesByCategory).map(([category, data]) => (
               <div key={category} className="bg-card rounded-xl p-4 border border-border">
                 <div className="flex items-center justify-between">
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${categoryColors[category]}`}>
+                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${getCategoryBadgeClass(category)}`}>
                     {category}
                   </span>
                   <span className="text-xs text-muted-foreground">{data.count} itens</span>
@@ -210,7 +210,7 @@ const Despesas = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${categoryColors[expense.category]}`}>
+                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${getCategoryBadgeClass(expense.category)}`}>
                       {expense.category}
                     </span>
                     <span className="font-semibold min-w-[80px] text-right">

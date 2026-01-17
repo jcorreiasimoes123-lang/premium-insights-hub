@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { CalendarIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarIcon, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { z } from "zod";
@@ -35,29 +35,28 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { useExpenseCategories } from "@/hooks/useExpenseCategories";
+import { useToast } from "@/hooks/use-toast";
 import type { Expense } from "@/data/mockData";
 
-const expenseSchema = z.object({
-  description: z
-    .string()
-    .trim()
-    .min(1, "Descrição é obrigatória")
-    .max(100, "Descrição deve ter no máximo 100 caracteres"),
-  amount: z
-    .string()
-    .min(1, "Valor é obrigatório")
-    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
-      message: "Valor deve ser maior que 0",
+const createExpenseSchema = (categoryNames: string[]) =>
+  z.object({
+    description: z
+      .string()
+      .trim()
+      .min(1, "Descrição é obrigatória")
+      .max(100, "Descrição deve ter no máximo 100 caracteres"),
+    amount: z
+      .string()
+      .min(1, "Valor é obrigatório")
+      .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+        message: "Valor deve ser maior que 0",
+      }),
+    category: z.string().min(1, "Seleciona uma categoria"),
+    date: z.date({
+      required_error: "Data é obrigatória",
     }),
-  category: z.enum(["Alimentação", "Subscrições", "Outros"], {
-    required_error: "Seleciona uma categoria",
-  }),
-  date: z.date({
-    required_error: "Data é obrigatória",
-  }),
-});
-
-type ExpenseFormData = z.infer<typeof expenseSchema>;
+  });
 
 interface ExpenseModalProps {
   open: boolean;
@@ -68,13 +67,20 @@ interface ExpenseModalProps {
 
 const ExpenseModal = ({ open, onOpenChange, expense, onSave }: ExpenseModalProps) => {
   const isEditing = !!expense;
+  const { categoryNames, addCategory } = useExpenseCategories();
+  const { toast } = useToast();
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [showAddCategory, setShowAddCategory] = useState(false);
+
+  const expenseSchema = createExpenseSchema(categoryNames);
+  type ExpenseFormData = z.infer<typeof expenseSchema>;
 
   const form = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
       description: "",
       amount: "",
-      category: undefined,
+      category: "",
       date: new Date(),
     },
   });
@@ -110,6 +116,24 @@ const ExpenseModal = ({ open, onOpenChange, expense, onSave }: ExpenseModalProps
 
     onSave(newExpense);
     onOpenChange(false);
+  };
+
+  const handleAddCategory = () => {
+    if (addCategory(newCategoryName)) {
+      toast({
+        title: "Categoria criada",
+        description: `"${newCategoryName}" foi adicionada às categorias.`,
+      });
+      form.setValue("category", newCategoryName);
+      setNewCategoryName("");
+      setShowAddCategory(false);
+    } else {
+      toast({
+        title: "Erro",
+        description: "Categoria já existe ou nome inválido.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -162,18 +186,71 @@ const ExpenseModal = ({ open, onOpenChange, expense, onSave }: ExpenseModalProps
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Categoria</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleciona uma categoria" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Alimentação">Alimentação</SelectItem>
-                      <SelectItem value="Subscrições">Subscrições</SelectItem>
-                      <SelectItem value="Outros">Outros</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleciona uma categoria" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categoryNames.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    {!showAddCategory ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-xs"
+                        onClick={() => setShowAddCategory(true)}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Nova categoria
+                      </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Nome da categoria"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          className="h-8 text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddCategory();
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8"
+                          onClick={handleAddCategory}
+                          disabled={!newCategoryName.trim()}
+                        >
+                          Adicionar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => {
+                            setShowAddCategory(false);
+                            setNewCategoryName("");
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
