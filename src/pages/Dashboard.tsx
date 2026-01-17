@@ -1,18 +1,19 @@
 import { useState, useEffect } from "react";
-import { Receipt, CreditCard, TrendingUp, ArrowUpRight, Wallet, X } from "lucide-react";
+import { Receipt, CreditCard, TrendingUp, ArrowUpRight, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import AppHeader from "@/components/AppHeader";
 import EmptyState from "@/components/EmptyState";
+import { useExpenseCategories } from "@/hooks/useExpenseCategories";
 import {
   Expense,
   Subscription,
   formatCurrency,
   formatDate,
-  categoryColors,
   getExpensesByCategory,
   getTotalSubscriptions,
   getActiveSubscriptionsCount,
+  getCategoryBadgeClass,
 } from "@/data/mockData";
 import {
   Dialog,
@@ -29,6 +30,7 @@ const Dashboard = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const { getCategoryColor } = useExpenseCategories();
 
   // Carregar dados do localStorage ao iniciar
   useEffect(() => {
@@ -51,7 +53,7 @@ const Dashboard = () => {
   const totalSubscriptions = getTotalSubscriptions(subscriptions);
   const totalMonthly = totalExpenses + totalSubscriptions;
   const activeSubsCount = getActiveSubscriptionsCount(subscriptions);
-  const expensesByCategory = getExpensesByCategory(expenses);
+  const expensesByCategory = getExpensesByCategory(expenses, getCategoryColor);
 
   // Últimas 5 despesas ordenadas por data
   const recentExpenses = [...expenses]
@@ -278,7 +280,7 @@ const Dashboard = () => {
                 {recentExpenses.map((expense) => (
                   <div key={expense.id} className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`px-2 py-1 rounded-md text-xs font-medium ${categoryColors[expense.category]}`}>
+                      <div className={`px-2 py-1 rounded-md text-xs font-medium ${getCategoryBadgeClass(expense.category)}`}>
                         {expense.category}
                       </div>
                       <div>

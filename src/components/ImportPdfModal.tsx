@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/data/mockData";
+import { getStoredCategories } from "@/hooks/useExpenseCategories";
 import type { Expense } from "@/data/mockData";
 
 interface ParsedTransaction {
@@ -25,7 +26,7 @@ interface ParsedTransaction {
   description: string;
   amount: number;
   date: string;
-  category: "Alimentação" | "Subscrições" | "Outros";
+  category: string;
   selected: boolean;
 }
 
@@ -155,11 +156,13 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
     );
   };
 
-  const updateCategory = (id: string, category: "Alimentação" | "Subscrições" | "Outros") => {
+  const updateCategory = (id: string, category: string) => {
     setTransactions((prev) =>
       prev.map((t) => (t.id === id ? { ...t, category } : t))
     );
   };
+
+  const storedCategories = getStoredCategories();
 
   const handleImport = () => {
     const selected = transactions.filter((t) => t.selected);
@@ -372,19 +375,18 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
                     <Select
                       value={transaction.category}
                       onValueChange={(value) =>
-                        updateCategory(
-                          transaction.id,
-                          value as "Alimentação" | "Subscrições" | "Outros"
-                        )
+                        updateCategory(transaction.id, value)
                       }
                     >
                       <SelectTrigger className="w-[130px] h-8 text-xs">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Alimentação">Alimentação</SelectItem>
-                        <SelectItem value="Subscrições">Subscrições</SelectItem>
-                        <SelectItem value="Outros">Outros</SelectItem>
+                        {storedCategories.map((cat) => (
+                          <SelectItem key={cat.name} value={cat.name}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <span className="font-semibold text-sm min-w-[70px] text-right">

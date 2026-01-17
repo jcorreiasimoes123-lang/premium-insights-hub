@@ -10,7 +10,7 @@ export interface Expense {
   id: string;
   description: string;
   amount: number;
-  category: "Alimentação" | "Subscrições" | "Outros";
+  category: string; // Agora suporta categorias personalizadas
   date: Date;
 }
 
@@ -153,22 +153,31 @@ export const formatDate = (date: Date): string => {
   });
 };
 
-// Cores por categoria
+// Cores por categoria (fallback para categorias antigas)
 export const categoryColors: Record<string, string> = {
   "Alimentação": "bg-emerald-500/10 text-emerald-600",
   "Subscrições": "bg-purple-500/10 text-purple-600",
+  "Transporte": "bg-blue-500/10 text-blue-600",
+  "Saúde": "bg-amber-500/10 text-amber-600",
+  "Lazer": "bg-cyan-500/10 text-cyan-600",
   "Outros": "bg-slate-500/10 text-slate-600",
 };
 
-// Cores para gráfico (hex)
+// Cores para gráfico (fallback)
 export const categoryChartColors: Record<string, string> = {
   "Alimentação": "#10b981",
   "Subscrições": "#a855f7",
+  "Transporte": "#3b82f6",
+  "Saúde": "#f59e0b",
+  "Lazer": "#06b6d4",
   "Outros": "#64748b",
 };
 
-// Agregar despesas por categoria
-export const getExpensesByCategory = (expenses: Expense[] = mockExpenses) => {
+// Agregar despesas por categoria (usa cores do hook quando disponível)
+export const getExpensesByCategory = (
+  expenses: Expense[] = mockExpenses,
+  getCategoryColor?: (name: string) => string
+) => {
   const grouped = expenses.reduce((acc, exp) => {
     acc[exp.category] = (acc[exp.category] || 0) + exp.amount;
     return acc;
@@ -177,6 +186,11 @@ export const getExpensesByCategory = (expenses: Expense[] = mockExpenses) => {
   return Object.entries(grouped).map(([name, value]) => ({
     name,
     value: Number(value.toFixed(2)),
-    color: categoryChartColors[name] || "#64748b",
+    color: getCategoryColor ? getCategoryColor(name) : (categoryChartColors[name] || "#64748b"),
   }));
+};
+
+// Obter cor de badge para categoria
+export const getCategoryBadgeClass = (category: string): string => {
+  return categoryColors[category] || "bg-slate-500/10 text-slate-600";
 };
