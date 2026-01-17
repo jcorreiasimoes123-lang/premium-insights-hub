@@ -70,42 +70,31 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash", // Vision-capable model
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "user",
             content: [
               {
                 type: "text",
-                text: `Analisa este extrato bancário português e extrai TODAS as transações/movimentos que consegues ver.
+                text: `Analisa este extrato bancário português e extrai as transações/movimentos que vês.
 
-REGRAS CRÍTICAS:
-1. Extrai APENAS transações que vês REALMENTE no documento
-2. NUNCA inventes ou assumes transações
-3. Se não conseguires ver transações claras, responde com []
-4. Usa EXATAMENTE os textos/descrições que aparecem no extrato
-5. Valores devem ser positivos (converte negativos para positivos)
-6. Ignora saldos, só extrai movimentos/transações individuais
+REGRAS:
+1. Extrai APENAS transações reais do documento
+2. NUNCA inventes transações
+3. Se não vires transações claras, responde []
+4. Máximo 50 transações (as mais recentes)
+5. Valores sempre positivos
 
-Para cada transação encontrada, identifica:
-- description: o texto exato da descrição/beneficiário
-- amount: o valor numérico (sempre positivo)
-- date: a data no formato YYYY-MM-DD
+Para cada transação:
+- description: texto da descrição (máx 60 caracteres)
+- amount: valor numérico positivo
+- date: data YYYY-MM-DD
 
-Categorias a atribuir:
-- "Alimentação": supermercados, restaurantes, cafés, padarias
-- "Transporte": combustível, portagens, transportes públicos
-- "Subscrições": serviços recorrentes, telecomunicações, streaming
-- "Saúde": farmácias, clínicas, hospitais
-- "Lazer": entretenimento, viagens, desporto
-- "Compras": lojas, vestuário, eletrónica
-- "Habitação": renda, água, luz, gás
-- "Outros": tudo o resto
+Categorias: "Alimentação", "Transporte", "Subscrições", "Saúde", "Lazer", "Compras", "Habitação", "Outros"
 
-RESPONDE APENAS com um JSON array válido, sem markdown nem explicações:
-[{"description": "TEXTO_DO_EXTRATO", "amount": 12.34, "date": "2024-01-15", "category": "Outros"}]
-
-Se não encontrares transações, responde apenas: []`
+Responde APENAS com JSON array compacto, sem markdown:
+[{"description":"TEXTO","amount":12.34,"date":"2024-01-15","category":"Outros"}]`
               },
               {
                 type: "image_url",
@@ -117,7 +106,7 @@ Se não encontrares transações, responde apenas: []`
           }
         ],
         temperature: 0,
-        max_tokens: 4000,
+        max_tokens: 8000,
       }),
     });
 
@@ -147,7 +136,8 @@ Se não encontrares transações, responde apenas: []`
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content || "[]";
     
-    console.log("Resposta da AI:", content.substring(0, 1000));
+    console.log("Resposta da AI (primeiros 500 chars):", content.substring(0, 500));
+    console.log("Tamanho total da resposta:", content.length);
 
     // Parse the AI response
     let transactions = [];
@@ -168,43 +158,61 @@ Se não encontrares transações, responde apenas: []`
       if (cleanContent === "[]" || cleanContent === "") {
         transactions = [];
       } else {
+        // Try to fix truncated JSON by finding the last complete object
+        if (!cleanContent.endsWith("]")) {
+          console.log("JSON parece truncado, tentando corrigir...");
+          // Find the last complete object (ends with })
+          const lastCompleteObjIndex = cleanContent.lastIndexOf("},");
+          if (lastCompleteObjIndex > 0) {
+            cleanContent = cleanContent.substring(0, lastCompleteObjIndex + 1) + "]";
+            console.log("JSON corrigido até posição:", lastCompleteObjIndex);
+          } else {
+            // Try to find just the last }
+            const lastBraceIndex = cleanContent.lastIndexOf("}");
+            if (lastBraceIndex > 0) {
+              cleanContent = cleanContent.substring(0, lastBraceIndex + 1) + "]";
+            }
+          }
+        }
+        
         transactions = JSON.parse(cleanContent);
       }
       
-      // Validate and normalize transactions - be strict
+      // Validate and normalize transactions
       transactions = transactions
         .filter((t: any) => {
-          // Must have all required fields with real values
           if (!t.description || !t.amount || !t.date) return false;
-          // Description must have at least 2 chars
           if (String(t.description).trim().length < 2) return false;
-          // Amount must be a valid number
           if (isNaN(Number(t.amount)) || Number(t.amount) <= 0) return false;
-          // Date must look valid (basic check)
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) {
-            // Try to fix common date formats
-            const dateMatch = String(t.date).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-            if (dateMatch) {
-              t.date = `${dateMatch[3]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[1].padStart(2, '0')}`;
-            } else {
-              return false;
-            }
-          }
           return true;
         })
-        .map((t: any, index: number) => ({
-          id: `import-${Date.now()}-${index}`,
-          description: String(t.description).trim().substring(0, 100),
-          amount: Math.abs(Number(t.amount)),
-          date: t.date,
-          category: ["Alimentação", "Transporte", "Subscrições", "Saúde", "Lazer", "Compras", "Habitação", "Outros"].includes(t.category) 
-            ? t.category 
-            : "Outros",
-          selected: true,
-        }));
+        .map((t: any, index: number) => {
+          // Fix date format if needed
+          let date = t.date;
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            const dateMatch = String(date).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (dateMatch) {
+              date = `${dateMatch[3]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[1].padStart(2, '0')}`;
+            } else {
+              date = new Date().toISOString().split('T')[0];
+            }
+          }
+          
+          return {
+            id: `import-${Date.now()}-${index}`,
+            description: String(t.description).trim().substring(0, 100),
+            amount: Math.abs(Number(t.amount)),
+            date: date,
+            category: ["Alimentação", "Transporte", "Subscrições", "Saúde", "Lazer", "Compras", "Habitação", "Outros"].includes(t.category) 
+              ? t.category 
+              : "Outros",
+            selected: true,
+          };
+        })
+        .slice(0, 50); // Limit to 50 transactions
         
     } catch (parseError) {
-      console.error("Erro ao fazer parse do JSON:", parseError, content);
+      console.error("Erro ao fazer parse do JSON:", parseError, content.substring(0, 200));
       transactions = [];
     }
 
