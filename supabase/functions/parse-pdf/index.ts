@@ -5,50 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Helper to extract text from PDF using pdf-parse approach
-async function extractTextFromPdf(arrayBuffer: ArrayBuffer): Promise<string> {
-  // Convert to Uint8Array for processing
-  const uint8Array = new Uint8Array(arrayBuffer);
-  
-  // Try to find text streams in PDF
-  let text = "";
-  const decoder = new TextDecoder("utf-8", { fatal: false });
-  const rawText = decoder.decode(uint8Array);
-  
-  // Extract text between stream markers (simplified PDF text extraction)
-  const streamRegex = /stream\s*([\s\S]*?)\s*endstream/g;
-  let match;
-  
-  while ((match = streamRegex.exec(rawText)) !== null) {
-    const streamContent = match[1];
-    // Filter printable characters
-    const printable = streamContent.replace(/[^\x20-\x7E\xA0-\xFF\n\r\t]/g, " ");
-    if (printable.trim().length > 10) {
-      text += printable + "\n";
-    }
-  }
-  
-  // Also try to extract text objects (Tj, TJ operators)
-  const textObjRegex = /\(([^)]+)\)\s*Tj/g;
-  while ((match = textObjRegex.exec(rawText)) !== null) {
-    text += match[1] + " ";
-  }
-  
-  // If no text found via streams, try raw extraction
-  if (text.trim().length < 50) {
-    // Extract anything that looks like text
-    const lines = rawText.split(/[\r\n]+/);
-    for (const line of lines) {
-      const cleaned = line.replace(/[^\x20-\x7E\xA0-\xFF]/g, "").trim();
-      if (cleaned.length > 5 && !/^[%\/\[\]<>{}]+$/.test(cleaned)) {
-        text += cleaned + "\n";
-      }
-    }
-  }
-  
-  return text;
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -68,34 +24,6 @@ serve(async (req) => {
 
     console.log(`Recebido ficheiro: ${file.name}, tamanho: ${file.size} bytes, tipo: ${file.type}`);
 
-    // Extract text based on file type
-    let fileContent: string;
-    
-    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-      // For PDFs, use our extraction method
-      const arrayBuffer = await file.arrayBuffer();
-      fileContent = await extractTextFromPdf(arrayBuffer);
-      console.log(`Texto extraído do PDF (${fileContent.length} chars)`);
-    } else {
-      // For text files (CSV, TXT)
-      fileContent = await file.text();
-    }
-    
-    // Log a sample of the content for debugging
-    console.log("Amostra do conteúdo:", fileContent.substring(0, 500));
-
-    if (fileContent.trim().length < 20) {
-      console.log("Conteúdo insuficiente extraído do ficheiro");
-      return new Response(
-        JSON.stringify({ 
-          error: "Não foi possível extrair texto do ficheiro. O PDF pode estar protegido ou ser uma imagem.",
-          transactions: [],
-          message: "O ficheiro não contém texto legível. Tenta um extrato em formato diferente."
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
@@ -106,7 +34,35 @@ serve(async (req) => {
       );
     }
 
-    // Use AI to extract transactions with a MUCH stricter prompt
+    // Check file size (max 10MB for base64)
+    if (file.size > 10 * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({ error: "Ficheiro demasiado grande. Máximo 10MB." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Convert file to base64 for vision model
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = btoa(
+      new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
+    );
+    
+    // Determine MIME type
+    let mimeType = file.type;
+    if (!mimeType || mimeType === "application/octet-stream") {
+      if (file.name.toLowerCase().endsWith(".pdf")) {
+        mimeType = "application/pdf";
+      } else if (file.name.toLowerCase().endsWith(".csv")) {
+        mimeType = "text/csv";
+      } else if (file.name.toLowerCase().endsWith(".txt")) {
+        mimeType = "text/plain";
+      }
+    }
+
+    console.log(`Enviando ficheiro para AI com tipo: ${mimeType}`);
+
+    // Use Gemini with vision capability to read the document directly
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -114,37 +70,54 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash", // Vision-capable model
         messages: [
           {
-            role: "system",
-            content: `Tu és um extrator de dados de extratos bancários portugueses. A tua tarefa é extrair APENAS transações que existem REALMENTE no texto fornecido.
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Analisa este extrato bancário português e extrai TODAS as transações/movimentos que consegues ver.
 
 REGRAS CRÍTICAS:
-1. NUNCA inventes transações - extrai APENAS o que está escrito no documento
-2. Se não conseguires identificar transações claras, responde com []
-3. Cada transação DEVE ter: descrição real do texto, valor numérico, data
-4. NÃO assumes nomes de lojas - usa EXATAMENTE o texto que aparece no extrato
-5. Se um campo estiver ilegível ou ausente, ignora essa transação
-6. Valores devem ser números positivos (despesas)
-7. Datas no formato YYYY-MM-DD
+1. Extrai APENAS transações que vês REALMENTE no documento
+2. NUNCA inventes ou assumes transações
+3. Se não conseguires ver transações claras, responde com []
+4. Usa EXATAMENTE os textos/descrições que aparecem no extrato
+5. Valores devem ser positivos (converte negativos para positivos)
+6. Ignora saldos, só extrai movimentos/transações individuais
 
-Categorias permitidas (escolhe a mais apropriada):
-- "Alimentação": supermercados (Continente, Pingo Doce, Lidl, Aldi), restaurantes, cafés
-- "Subscrições": serviços mensais recorrentes, telecomunicações, streaming
+Para cada transação encontrada, identifica:
+- description: o texto exato da descrição/beneficiário
+- amount: o valor numérico (sempre positivo)
+- date: a data no formato YYYY-MM-DD
+
+Categorias a atribuir:
+- "Alimentação": supermercados, restaurantes, cafés, padarias
+- "Transporte": combustível, portagens, transportes públicos
+- "Subscrições": serviços recorrentes, telecomunicações, streaming
+- "Saúde": farmácias, clínicas, hospitais
+- "Lazer": entretenimento, viagens, desporto
+- "Compras": lojas, vestuário, eletrónica
+- "Habitação": renda, água, luz, gás
 - "Outros": tudo o resto
 
-FORMATO DE RESPOSTA - apenas JSON array, sem markdown:
-[{"description": "TEXTO_EXATO_DO_EXTRATO", "amount": 12.34, "date": "2024-01-15", "category": "Outros"}]
+RESPONDE APENAS com um JSON array válido, sem markdown nem explicações:
+[{"description": "TEXTO_DO_EXTRATO", "amount": 12.34, "date": "2024-01-15", "category": "Outros"}]
 
-Se o texto não contiver transações bancárias claras, responde APENAS: []`
-          },
-          {
-            role: "user",
-            content: `Extrai APENAS as transações que consegues ver claramente neste texto de extrato bancário. NÃO inventes nada:\n\n${fileContent.substring(0, 20000)}`
+Se não encontrares transações, responde apenas: []`
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${mimeType};base64,${base64}`
+                }
+              }
+            ]
           }
         ],
-        temperature: 0, // Zero temperature for deterministic, factual output
+        temperature: 0,
+        max_tokens: 4000,
       }),
     });
 
@@ -166,7 +139,7 @@ Se o texto não contiver transações bancárias claras, responde APENAS: []`
       }
       
       return new Response(
-        JSON.stringify({ error: "Erro ao processar o documento" }),
+        JSON.stringify({ error: "Erro ao processar o documento com AI" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -174,7 +147,7 @@ Se o texto não contiver transações bancárias claras, responde APENAS: []`
     const aiData = await aiResponse.json();
     const content = aiData.choices?.[0]?.message?.content || "[]";
     
-    console.log("Resposta da AI:", content);
+    console.log("Resposta da AI:", content.substring(0, 1000));
 
     // Parse the AI response
     let transactions = [];
@@ -207,8 +180,16 @@ Se o texto não contiver transações bancárias claras, responde APENAS: []`
           if (String(t.description).trim().length < 2) return false;
           // Amount must be a valid number
           if (isNaN(Number(t.amount)) || Number(t.amount) <= 0) return false;
-          // Date must be valid
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) return false;
+          // Date must look valid (basic check)
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(t.date)) {
+            // Try to fix common date formats
+            const dateMatch = String(t.date).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (dateMatch) {
+              t.date = `${dateMatch[3]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[1].padStart(2, '0')}`;
+            } else {
+              return false;
+            }
+          }
           return true;
         })
         .map((t: any, index: number) => ({
@@ -216,7 +197,7 @@ Se o texto não contiver transações bancárias claras, responde APENAS: []`
           description: String(t.description).trim().substring(0, 100),
           amount: Math.abs(Number(t.amount)),
           date: t.date,
-          category: ["Alimentação", "Subscrições", "Outros"].includes(t.category) 
+          category: ["Alimentação", "Transporte", "Subscrições", "Saúde", "Lazer", "Compras", "Habitação", "Outros"].includes(t.category) 
             ? t.category 
             : "Outros",
           selected: true,
@@ -233,7 +214,6 @@ Se o texto não contiver transações bancárias claras, responde APENAS: []`
       JSON.stringify({ 
         transactions,
         fileName: file.name,
-        rawTextLength: fileContent.length,
         message: transactions.length > 0 
           ? `Encontradas ${transactions.length} transações no extrato` 
           : "Não foram encontradas transações. O ficheiro pode não conter um extrato bancário válido ou o formato não é suportado."
