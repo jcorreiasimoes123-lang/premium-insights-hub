@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, FileText, Loader2, Check, X, AlertCircle } from "lucide-react";
+import { Upload, FileText, Loader2, Check, X, AlertCircle, Bug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -33,6 +33,14 @@ interface ImportPdfModalProps {
   onImport: (expenses: Omit<Expense, "id">[]) => void;
 }
 
+interface DiagnosticInfo {
+  status?: number;
+  message?: string;
+  transactionCount?: number;
+  responsePreview?: string;
+  processingTimeMs?: number;
+}
+
 const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -41,6 +49,8 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
   const [fileName, setFileName] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<ParsedTransaction[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticInfo | null>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,6 +78,9 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
     setError(null);
     setFileName(file.name);
     setTransactions([]);
+    setDiagnostics(null);
+
+    const startTime = Date.now();
 
     try {
       const formData = new FormData();
@@ -84,10 +97,20 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
         }
       );
 
+      const processingTimeMs = Date.now() - startTime;
       const data = await response.json();
 
+      // Store diagnostics
+      setDiagnostics({
+        status: response.status,
+        message: data.message || data.error || "Sem mensagem",
+        transactionCount: data.transactions?.length || 0,
+        responsePreview: JSON.stringify(data).substring(0, 300),
+        processingTimeMs,
+      });
+
       if (!response.ok) {
-        throw new Error(data.error || "Erro ao processar ficheiro");
+        throw new Error(data.error || `Erro ${response.status}`);
       }
 
       if (data.transactions && data.transactions.length > 0) {
@@ -101,7 +124,16 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
       }
     } catch (err) {
       console.error("Erro:", err);
-      setError(err instanceof Error ? err.message : "Erro ao processar ficheiro");
+      const errorMsg = err instanceof Error ? err.message : "Erro ao processar ficheiro";
+      setError(errorMsg);
+      if (!diagnostics) {
+        setDiagnostics({
+          status: 0,
+          message: errorMsg,
+          transactionCount: 0,
+          processingTimeMs: Date.now() - startTime,
+        });
+      }
     } finally {
       setIsLoading(false);
       if (fileInputRef.current) {
@@ -166,6 +198,8 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
     setFileName(null);
     setError(null);
     setIsLoading(false);
+    setShowDiagnostics(false);
+    setDiagnostics(null);
   };
 
   const selectedCount = transactions.filter((t) => t.selected).length;
@@ -222,22 +256,69 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
 
           {/* Error State */}
           {error && !isLoading && (
-            <div className="flex items-start gap-3 p-4 bg-destructive/10 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-destructive">{error}</p>
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-0 h-auto text-xs"
-                  onClick={() => {
-                    setError(null);
-                    setFileName(null);
-                  }}
-                >
-                  Tentar outro ficheiro
-                </Button>
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 p-4 bg-destructive/10 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-destructive">{error}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 h-auto text-xs"
+                      onClick={() => {
+                        setError(null);
+                        setFileName(null);
+                        setDiagnostics(null);
+                      }}
+                    >
+                      Tentar outro ficheiro
+                    </Button>
+                    <span className="text-muted-foreground">•</span>
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="p-0 h-auto text-xs flex items-center gap-1"
+                      onClick={() => setShowDiagnostics(!showDiagnostics)}
+                    >
+                      <Bug className="w-3 h-3" />
+                      {showDiagnostics ? "Ocultar diagnóstico" : "Ver diagnóstico"}
+                    </Button>
+                  </div>
+                </div>
               </div>
+              
+              {/* Diagnostics Panel */}
+              {showDiagnostics && diagnostics && (
+                <div className="p-3 bg-muted/50 rounded-lg border text-xs font-mono space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status HTTP:</span>
+                    <span className={diagnostics.status === 200 ? "text-green-600" : "text-destructive"}>
+                      {diagnostics.status || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Transações:</span>
+                    <span>{diagnostics.transactionCount ?? 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tempo:</span>
+                    <span>{diagnostics.processingTimeMs ? `${(diagnostics.processingTimeMs / 1000).toFixed(1)}s` : "N/A"}</span>
+                  </div>
+                  <div className="pt-2 border-t border-border mt-2">
+                    <span className="text-muted-foreground block mb-1">Mensagem:</span>
+                    <p className="text-foreground break-words">{diagnostics.message}</p>
+                  </div>
+                  {diagnostics.responsePreview && (
+                    <div className="pt-2 border-t border-border mt-2">
+                      <span className="text-muted-foreground block mb-1">Resposta (preview):</span>
+                      <p className="text-foreground break-all text-[10px] opacity-70">
+                        {diagnostics.responsePreview}...
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
