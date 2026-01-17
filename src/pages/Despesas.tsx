@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Receipt, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Receipt, MoreVertical, Pencil, Trash2, Eraser } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,6 +28,7 @@ const Despesas = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>();
   const [deletingExpense, setDeletingExpense] = useState<Expense | undefined>();
+  const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
 
   // Carregar do localStorage
   useEffect(() => {
@@ -106,6 +107,16 @@ const Despesas = () => {
     setDeletingExpense(undefined);
   };
 
+  const handleClearAllExpenses = () => {
+    setExpenses([]);
+    toast({
+      title: "Despesas limpas",
+      description: "Todas as despesas foram eliminadas.",
+      variant: "destructive",
+    });
+    setIsClearAllDialogOpen(false);
+  };
+
   const handleImportExpenses = (newExpenses: Omit<Expense, "id">[]) => {
     const expensesWithIds: Expense[] = newExpenses.map((exp, index) => ({
       ...exp,
@@ -130,6 +141,12 @@ const Despesas = () => {
             <p className="text-muted-foreground">Regista e acompanha os teus gastos</p>
           </div>
           <div className="flex items-center gap-2">
+            {expenses.length > 0 && (
+              <Button variant="outline" onClick={() => setIsClearAllDialogOpen(true)}>
+                <Eraser className="w-4 h-4 mr-2" />
+                Limpar Tudo
+              </Button>
+            )}
             <ImportPdfModal onImport={handleImportExpenses} />
             <Button variant="hero" onClick={handleOpenNewModal}>
               <Receipt className="w-4 h-4 mr-2" />
@@ -242,6 +259,15 @@ const Despesas = () => {
         onCancel={() => setDeletingExpense(undefined)}
         title="Eliminar despesa?"
         description={`Tens a certeza que queres eliminar "${deletingExpense?.description}"? Esta ação não pode ser desfeita.`}
+      />
+
+      {/* Dialog de confirmação para limpar tudo */}
+      <DeleteConfirmDialog
+        open={isClearAllDialogOpen}
+        onConfirm={handleClearAllExpenses}
+        onCancel={() => setIsClearAllDialogOpen(false)}
+        title="Limpar todas as despesas?"
+        description="Tens a certeza que queres eliminar TODAS as despesas? Esta ação não pode ser desfeita."
       />
     </div>
   );
