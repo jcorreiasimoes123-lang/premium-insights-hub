@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Receipt, MoreVertical, Pencil, Trash2, Eraser } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Receipt, MoreVertical, Pencil, Trash2, Eraser, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -7,6 +7,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import AppHeader from "@/components/AppHeader";
 import ExpenseModal from "@/components/ExpenseModal";
 import ImportPdfModal from "@/components/ImportPdfModal";
@@ -29,6 +36,7 @@ const Despesas = () => {
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>();
   const [deletingExpense, setDeletingExpense] = useState<Expense | undefined>();
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("todas");
 
   // Carregar do localStorage
   useEffect(() => {
@@ -44,6 +52,12 @@ const Despesas = () => {
     localStorage.setItem(EXPENSES_KEY, JSON.stringify(expenses));
   }, [expenses]);
 
+  // Obter lista única de categorias
+  const categories = useMemo(() => {
+    const cats = [...new Set(expenses.map((e) => e.category))];
+    return cats.sort();
+  }, [expenses]);
+
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
 
   // Agrupar despesas por categoria
@@ -56,10 +70,18 @@ const Despesas = () => {
     return acc;
   }, {} as Record<string, { total: number; count: number }>);
 
-  // Ordenar despesas por data (mais recentes primeiro)
-  const sortedExpenses = [...expenses].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  // Filtrar e ordenar despesas
+  const filteredExpenses = useMemo(() => {
+    let filtered = [...expenses];
+    if (selectedCategory !== "todas") {
+      filtered = filtered.filter((e) => e.category === selectedCategory);
+    }
+    return filtered.sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [expenses, selectedCategory]);
+
+  const filteredTotal = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
 
   const handleOpenNewModal = () => {
     setEditingExpense(undefined);
@@ -187,18 +209,52 @@ const Despesas = () => {
 
         {/* Expenses List */}
         <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="p-4 border-b border-border">
-            <h2 className="font-semibold">Todas as Despesas</h2>
+          <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold">
+                {selectedCategory === "todas" ? "Todas as Despesas" : `Despesas: ${selectedCategory}`}
+              </h2>
+              <span className="text-sm text-muted-foreground">
+                ({filteredExpenses.length} {filteredExpenses.length === 1 ? "item" : "itens"} · {formatCurrency(filteredTotal)})
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filtrar por categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas as categorias</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat} ({expensesByCategory[cat]?.count || 0})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="divide-y divide-border">
-            {sortedExpenses.length === 0 ? (
+            {filteredExpenses.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 <Receipt className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Ainda não tens despesas.</p>
-                <p className="text-sm">Adiciona manualmente ou importa um extrato bancário.</p>
+                {expenses.length === 0 ? (
+                  <>
+                    <p>Ainda não tens despesas.</p>
+                    <p className="text-sm">Adiciona manualmente ou importa um extrato bancário.</p>
+                  </>
+                ) : (
+                  <>
+                    <p>Nenhuma despesa em "{selectedCategory}".</p>
+                    <Button variant="link" onClick={() => setSelectedCategory("todas")}>
+                      Ver todas as despesas
+                    </Button>
+                  </>
+                )}
               </div>
             ) : (
-              sortedExpenses.map((expense) => (
+              filteredExpenses.map((expense) => (
                 <div key={expense.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
