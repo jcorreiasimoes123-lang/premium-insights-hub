@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Receipt, CreditCard, TrendingUp, ArrowUpRight, Wallet } from "lucide-react";
+import { Receipt, CreditCard, TrendingUp, ArrowUpRight, Wallet, X } from "lucide-react";
 import { Link } from "react-router-dom";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import AppHeader from "@/components/AppHeader";
 import EmptyState from "@/components/EmptyState";
 import {
@@ -14,6 +14,12 @@ import {
   getTotalSubscriptions,
   getActiveSubscriptionsCount,
 } from "@/data/mockData";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Chaves para localStorage
 const EXPENSES_KEY = "carteira-pt-expenses";
@@ -22,6 +28,7 @@ const SUBSCRIPTIONS_KEY = "carteira-pt-subscriptions";
 const Dashboard = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Carregar dados do localStorage ao iniciar
   useEffect(() => {
@@ -55,6 +62,18 @@ const Dashboard = () => {
   const activeSubscriptions = subscriptions.filter((s) => s.status === "active");
 
   const hasData = expenses.length > 0 || subscriptions.length > 0;
+
+  // Despesas filtradas pela categoria selecionada
+  const categoryExpenses = selectedCategory
+    ? expenses.filter((e) => e.category === selectedCategory)
+    : [];
+
+  // Handler para clique no gráfico
+  const handlePieClick = (data: any) => {
+    if (data && data.name) {
+      setSelectedCategory(data.name);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -125,36 +144,61 @@ const Dashboard = () => {
         {/* Expenses by Category Chart */}
         <div className="bg-card rounded-xl border border-border p-6 mb-8">
           <h2 className="font-semibold mb-4">Despesas por Categoria</h2>
+          <p className="text-xs text-muted-foreground mb-4">Clica numa fatia para ver o detalhe</p>
           {expensesByCategory.length > 0 ? (
-            <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={expensesByCategory}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={4}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: €${value}`}
-                    labelLine={false}
-                  >
-                    {expensesByCategory.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value: number) => [`€${value.toFixed(2)}`, "Valor"]}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="flex flex-col lg:flex-row items-center gap-6">
+              {/* Gráfico */}
+              <div className="h-[240px] w-full lg:w-1/2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={expensesByCategory}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={90}
+                      paddingAngle={3}
+                      dataKey="value"
+                      onClick={handlePieClick}
+                      style={{ cursor: "pointer" }}
+                    >
+                      {expensesByCategory.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: number) => [`€${value.toFixed(2)}`, "Valor"]}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Legenda limpa com valores */}
+              <div className="w-full lg:w-1/2 space-y-2">
+                {expensesByCategory
+                  .sort((a, b) => b.value - a.value)
+                  .map((cat) => (
+                    <button
+                      key={cat.name}
+                      onClick={() => setSelectedCategory(cat.name)}
+                      className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        <span className="text-sm font-medium">{cat.name}</span>
+                      </div>
+                      <span className="font-semibold text-sm">{formatCurrency(cat.value)}</span>
+                    </button>
+                  ))}
+              </div>
             </div>
           ) : (
             <EmptyState
@@ -166,6 +210,55 @@ const Dashboard = () => {
             />
           )}
         </div>
+
+        {/* Modal de detalhe da categoria */}
+        <Dialog open={!!selectedCategory} onOpenChange={() => setSelectedCategory(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{
+                    backgroundColor: expensesByCategory.find((c) => c.name === selectedCategory)?.color,
+                  }}
+                />
+                {selectedCategory}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[400px] overflow-y-auto">
+              {categoryExpenses.length > 0 ? (
+                <div className="space-y-2">
+                  {categoryExpenses
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .map((expense) => (
+                      <div
+                        key={expense.id}
+                        className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium text-sm">{expense.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(new Date(expense.date))}
+                          </p>
+                        </div>
+                        <span className="font-semibold">{formatCurrency(expense.amount)}</span>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm text-center py-4">
+                  Sem despesas nesta categoria
+                </p>
+              )}
+            </div>
+            <div className="pt-4 border-t border-border flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="font-bold text-lg">
+                {formatCurrency(categoryExpenses.reduce((sum, e) => sum + e.amount, 0))}
+              </span>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Recent Activity & Subscriptions */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
