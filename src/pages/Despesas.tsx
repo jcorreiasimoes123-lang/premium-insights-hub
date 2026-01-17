@@ -1,9 +1,18 @@
-import { useState } from "react";
-import { Receipt } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Receipt, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import AppHeader from "@/components/AppHeader";
-import AddExpenseModal from "@/components/AddExpenseModal";
+import ExpenseModal from "@/components/ExpenseModal";
 import ImportPdfModal from "@/components/ImportPdfModal";
+import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "@/hooks/use-toast";
 import {
   formatCurrency,
   formatDate,
@@ -11,8 +20,28 @@ import {
   type Expense,
 } from "@/data/mockData";
 
+const EXPENSES_KEY = "carteira-pt-expenses";
+
 const Despesas = () => {
+  const { toast } = useToast();
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | undefined>();
+  const [deletingExpense, setDeletingExpense] = useState<Expense | undefined>();
+
+  // Carregar do localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(EXPENSES_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      setExpenses(parsed.map((e: any) => ({ ...e, date: new Date(e.date) })));
+    }
+  }, []);
+
+  // Guardar no localStorage
+  useEffect(() => {
+    localStorage.setItem(EXPENSES_KEY, JSON.stringify(expenses));
+  }, [expenses]);
 
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
 
@@ -28,15 +57,53 @@ const Despesas = () => {
 
   // Ordenar despesas por data (mais recentes primeiro)
   const sortedExpenses = [...expenses].sort(
-    (a, b) => b.date.getTime() - a.date.getTime()
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
-  const handleAddExpense = (newExpense: Omit<Expense, "id">) => {
-    const expense: Expense = {
-      ...newExpense,
-      id: `exp-${Date.now()}`,
-    };
-    setExpenses((prev) => [...prev, expense]);
+  const handleOpenNewModal = () => {
+    setEditingExpense(undefined);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (expense: Expense) => {
+    setEditingExpense(expense);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveExpense = (data: Omit<Expense, "id">) => {
+    if (editingExpense) {
+      setExpenses((prev) =>
+        prev.map((e) =>
+          e.id === editingExpense.id ? { ...data, id: e.id } : e
+        )
+      );
+      toast({
+        title: "Despesa atualizada",
+        description: `"${data.description}" foi atualizada com sucesso.`,
+      });
+    } else {
+      const newExpense: Expense = {
+        ...data,
+        id: `exp-${Date.now()}`,
+      };
+      setExpenses((prev) => [...prev, newExpense]);
+      toast({
+        title: "Despesa adicionada",
+        description: `"${data.description}" foi adicionada.`,
+      });
+    }
+    setEditingExpense(undefined);
+  };
+
+  const handleDeleteExpense = () => {
+    if (!deletingExpense) return;
+    setExpenses((prev) => prev.filter((e) => e.id !== deletingExpense.id));
+    toast({
+      title: "Despesa eliminada",
+      description: `"${deletingExpense.description}" foi eliminada.`,
+      variant: "destructive",
+    });
+    setDeletingExpense(undefined);
   };
 
   const handleImportExpenses = (newExpenses: Omit<Expense, "id">[]) => {
@@ -45,6 +112,10 @@ const Despesas = () => {
       id: `exp-import-${Date.now()}-${index}`,
     }));
     setExpenses((prev) => [...prev, ...expensesWithIds]);
+    toast({
+      title: "Despesas importadas",
+      description: `${newExpenses.length} despesa(s) importada(s) com sucesso.`,
+    });
   };
 
   return (
@@ -60,7 +131,10 @@ const Despesas = () => {
           </div>
           <div className="flex items-center gap-2">
             <ImportPdfModal onImport={handleImportExpenses} />
-            <AddExpenseModal onAddExpense={handleAddExpense} />
+            <Button variant="hero" onClick={handleOpenNewModal}>
+              <Receipt className="w-4 h-4 mr-2" />
+              Nova Despesa
+            </Button>
           </div>
         </div>
 
@@ -115,7 +189,7 @@ const Despesas = () => {
                     </div>
                     <div>
                       <p className="font-medium">{expense.description}</p>
-                      <p className="text-sm text-muted-foreground">{formatDate(expense.date)}</p>
+                      <p className="text-sm text-muted-foreground">{formatDate(new Date(expense.date))}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -125,6 +199,26 @@ const Despesas = () => {
                     <span className="font-semibold min-w-[80px] text-right">
                       {formatCurrency(expense.amount)}
                     </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleOpenEditModal(expense)}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeletingExpense(expense)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               ))
@@ -132,6 +226,23 @@ const Despesas = () => {
           </div>
         </div>
       </main>
+
+      {/* Modal para criar/editar */}
+      <ExpenseModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        expense={editingExpense}
+        onSave={handleSaveExpense}
+      />
+
+      {/* Dialog de confirmação para eliminar */}
+      <DeleteConfirmDialog
+        open={!!deletingExpense}
+        onConfirm={handleDeleteExpense}
+        onCancel={() => setDeletingExpense(undefined)}
+        title="Eliminar despesa?"
+        description={`Tens a certeza que queres eliminar "${deletingExpense?.description}"? Esta ação não pode ser desfeita.`}
+      />
     </div>
   );
 };
