@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, FileText, Loader2, Check, X, AlertCircle, Bug } from "lucide-react";
+import { Upload, FileText, Loader2, Check, X, AlertCircle, Bug, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -16,10 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency } from "@/data/mockData";
+import { formatCurrency, incomeCategories } from "@/data/mockData";
 import { getStoredCategories } from "@/hooks/useExpenseCategories";
-import type { Expense } from "@/data/mockData";
+import type { Expense, Income } from "@/data/mockData";
 
 interface ParsedTransaction {
   id: string;
@@ -27,11 +28,12 @@ interface ParsedTransaction {
   amount: number;
   date: string;
   category: string;
+  type: "expense" | "income";
   selected: boolean;
 }
 
 interface ImportPdfModalProps {
-  onImport: (expenses: Omit<Expense, "id">[]) => void;
+  onImport: (expenses: Omit<Expense, "id">[], incomes: Omit<Income, "id">[]) => void;
 }
 
 interface DiagnosticInfo {
@@ -163,10 +165,16 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
   };
 
   const storedCategories = getStoredCategories();
+  
+  // Separar transações por tipo
+  const expenseTransactions = transactions.filter(t => t.type === "expense");
+  const incomeTransactions = transactions.filter(t => t.type === "income");
 
   const handleImport = () => {
-    const selected = transactions.filter((t) => t.selected);
-    if (selected.length === 0) {
+    const selectedExpenses = transactions.filter((t) => t.selected && t.type === "expense");
+    const selectedIncomes = transactions.filter((t) => t.selected && t.type === "income");
+    
+    if (selectedExpenses.length === 0 && selectedIncomes.length === 0) {
       toast({
         title: "Nenhuma transação selecionada",
         description: "Seleciona pelo menos uma transação para importar.",
@@ -175,17 +183,29 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
       return;
     }
 
-    const expenses: Omit<Expense, "id">[] = selected.map((t) => ({
+    const expenses: Omit<Expense, "id">[] = selectedExpenses.map((t) => ({
+      description: t.description,
+      amount: t.amount,
+      category: t.category,
+      date: new Date(t.date),
+    }));
+    
+    const incomes: Omit<Income, "id">[] = selectedIncomes.map((t) => ({
       description: t.description,
       amount: t.amount,
       category: t.category,
       date: new Date(t.date),
     }));
 
-    onImport(expenses);
+    onImport(expenses, incomes);
+    
+    const parts = [];
+    if (selectedExpenses.length > 0) parts.push(`${selectedExpenses.length} despesa(s)`);
+    if (selectedIncomes.length > 0) parts.push(`${selectedIncomes.length} receita(s)`);
+    
     toast({
-      title: "Despesas importadas",
-      description: `${selected.length} despesas adicionadas com sucesso.`,
+      title: "Transações importadas",
+      description: `${parts.join(" e ")} adicionada(s) com sucesso.`,
     });
 
     // Reset and close
@@ -205,8 +225,13 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
     setDiagnostics(null);
   };
 
-  const selectedCount = transactions.filter((t) => t.selected).length;
-  const selectedTotal = transactions
+  const selectedExpenseCount = expenseTransactions.filter((t) => t.selected).length;
+  const selectedIncomeCount = incomeTransactions.filter((t) => t.selected).length;
+  const selectedCount = selectedExpenseCount + selectedIncomeCount;
+  const selectedExpenseTotal = expenseTransactions
+    .filter((t) => t.selected)
+    .reduce((sum, t) => sum + t.amount, 0);
+  const selectedIncomeTotal = incomeTransactions
     .filter((t) => t.selected)
     .reduce((sum, t) => sum + t.amount, 0);
 
@@ -325,86 +350,176 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
             </div>
           )}
 
-          {/* Transactions Preview */}
+          {/* Transactions Preview with Tabs */}
           {transactions.length > 0 && (
-            <>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={transactions.every((t) => t.selected)}
-                    onCheckedChange={toggleAll}
-                    id="select-all"
-                  />
-                  <label htmlFor="select-all" className="text-sm cursor-pointer">
-                    Selecionar todas ({transactions.length})
-                  </label>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setTransactions([]);
-                    setFileName(null);
-                  }}
-                >
-                  <X className="w-4 h-4 mr-1" />
-                  Limpar
-                </Button>
-              </div>
-
-              <div className="border rounded-lg divide-y divide-border max-h-[300px] overflow-y-auto">
-                {transactions.map((transaction) => (
-                  <div
-                    key={transaction.id}
-                    className={`p-3 flex items-center gap-3 hover:bg-muted/50 transition-colors ${
-                      !transaction.selected ? "opacity-50" : ""
-                    }`}
-                  >
-                    <Checkbox
-                      checked={transaction.selected}
-                      onCheckedChange={() => toggleTransaction(transaction.id)}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {transaction.description}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(transaction.date).toLocaleDateString("pt-PT")}
-                      </p>
-                    </div>
-                    <Select
-                      value={transaction.category}
-                      onValueChange={(value) =>
-                        updateCategory(transaction.id, value)
-                      }
-                    >
-                      <SelectTrigger className="w-[130px] h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {storedCategories.map((cat) => (
-                          <SelectItem key={cat.name} value={cat.name}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <span className="font-semibold text-sm min-w-[70px] text-right">
-                      {formatCurrency(transaction.amount)}
-                    </span>
+            <Tabs defaultValue={expenseTransactions.length > 0 ? "expenses" : "incomes"} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="expenses" className="flex items-center gap-2">
+                  <ArrowUpRight className="w-4 h-4 text-red-500" />
+                  Despesas ({expenseTransactions.length})
+                </TabsTrigger>
+                <TabsTrigger value="incomes" className="flex items-center gap-2">
+                  <ArrowDownLeft className="w-4 h-4 text-green-500" />
+                  Receitas ({incomeTransactions.length})
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="expenses">
+                {expenseTransactions.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground">
+                    <p>Nenhuma despesa encontrada no extrato.</p>
                   </div>
-                ))}
-              </div>
-
-              {/* Summary */}
-              <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between">
-                <span className="text-sm">
-                  <span className="font-medium">{selectedCount}</span> de{" "}
-                  {transactions.length} selecionadas
-                </span>
-                <span className="font-bold">{formatCurrency(selectedTotal)}</span>
-              </div>
-            </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={expenseTransactions.every((t) => t.selected)}
+                          onCheckedChange={() => {
+                            const allSelected = expenseTransactions.every((t) => t.selected);
+                            setTransactions((prev) =>
+                              prev.map((t) => t.type === "expense" ? { ...t, selected: !allSelected } : t)
+                            );
+                          }}
+                          id="select-all-expenses"
+                        />
+                        <label htmlFor="select-all-expenses" className="text-sm cursor-pointer">
+                          Selecionar todas ({expenseTransactions.length})
+                        </label>
+                      </div>
+                    </div>
+                    <div className="border rounded-lg divide-y divide-border max-h-[250px] overflow-y-auto">
+                      {expenseTransactions.map((transaction) => (
+                        <div
+                          key={transaction.id}
+                          className={`p-3 flex items-center gap-3 hover:bg-muted/50 transition-colors ${
+                            !transaction.selected ? "opacity-50" : ""
+                          }`}
+                        >
+                          <Checkbox
+                            checked={transaction.selected}
+                            onCheckedChange={() => toggleTransaction(transaction.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {transaction.description}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(transaction.date).toLocaleDateString("pt-PT")}
+                            </p>
+                          </div>
+                          <Select
+                            value={transaction.category}
+                            onValueChange={(value) =>
+                              updateCategory(transaction.id, value)
+                            }
+                          >
+                            <SelectTrigger className="w-[130px] h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {storedCategories.map((cat) => (
+                                <SelectItem key={cat.name} value={cat.name}>
+                                  {cat.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="font-semibold text-sm min-w-[70px] text-right text-red-600">
+                            -{formatCurrency(transaction.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="bg-red-50 dark:bg-red-950/20 rounded-lg p-3 flex items-center justify-between mt-2">
+                      <span className="text-sm">
+                        <span className="font-medium">{selectedExpenseCount}</span> de{" "}
+                        {expenseTransactions.length} selecionadas
+                      </span>
+                      <span className="font-bold text-red-600">-{formatCurrency(selectedExpenseTotal)}</span>
+                    </div>
+                  </>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="incomes">
+                {incomeTransactions.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground">
+                    <p>Nenhuma receita encontrada no extrato.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={incomeTransactions.every((t) => t.selected)}
+                          onCheckedChange={() => {
+                            const allSelected = incomeTransactions.every((t) => t.selected);
+                            setTransactions((prev) =>
+                              prev.map((t) => t.type === "income" ? { ...t, selected: !allSelected } : t)
+                            );
+                          }}
+                          id="select-all-incomes"
+                        />
+                        <label htmlFor="select-all-incomes" className="text-sm cursor-pointer">
+                          Selecionar todas ({incomeTransactions.length})
+                        </label>
+                      </div>
+                    </div>
+                    <div className="border rounded-lg divide-y divide-border max-h-[250px] overflow-y-auto">
+                      {incomeTransactions.map((transaction) => (
+                        <div
+                          key={transaction.id}
+                          className={`p-3 flex items-center gap-3 hover:bg-muted/50 transition-colors ${
+                            !transaction.selected ? "opacity-50" : ""
+                          }`}
+                        >
+                          <Checkbox
+                            checked={transaction.selected}
+                            onCheckedChange={() => toggleTransaction(transaction.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {transaction.description}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(transaction.date).toLocaleDateString("pt-PT")}
+                            </p>
+                          </div>
+                          <Select
+                            value={transaction.category}
+                            onValueChange={(value) =>
+                              updateCategory(transaction.id, value)
+                            }
+                          >
+                            <SelectTrigger className="w-[130px] h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {incomeCategories.map((cat) => (
+                                <SelectItem key={cat} value={cat}>
+                                  {cat}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <span className="font-semibold text-sm min-w-[70px] text-right text-green-600">
+                            +{formatCurrency(transaction.amount)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 flex items-center justify-between mt-2">
+                      <span className="text-sm">
+                        <span className="font-medium">{selectedIncomeCount}</span> de{" "}
+                        {incomeTransactions.length} selecionadas
+                      </span>
+                      <span className="font-bold text-green-600">+{formatCurrency(selectedIncomeTotal)}</span>
+                    </div>
+                  </>
+                )}
+              </TabsContent>
+            </Tabs>
           )}
         </div>
 

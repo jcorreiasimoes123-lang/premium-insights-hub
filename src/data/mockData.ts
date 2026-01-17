@@ -14,6 +14,14 @@ export interface Expense {
   date: Date;
 }
 
+export interface Income {
+  id: string;
+  description: string;
+  amount: number;
+  category: string;
+  date: Date;
+}
+
 export interface Subscription {
   id: string;
   name: string;
@@ -23,6 +31,16 @@ export interface Subscription {
   includeInTotal: boolean;
   category: string;
 }
+
+// Categorias de receita
+export const incomeCategories = [
+  "Salário",
+  "Freelance",
+  "Investimentos",
+  "Reembolso",
+  "Transferência",
+  "Outros",
+] as const;
 
 // Categorias de subscrição
 export const subscriptionCategories = [
