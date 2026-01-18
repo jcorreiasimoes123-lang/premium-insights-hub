@@ -1,32 +1,86 @@
-import { useState } from "react";
-import { Wallet, ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Wallet, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
+import { useAuth } from "@/contexts/AuthContext";
+import { z } from "zod";
+
+const registerSchema = z.object({
+  name: z.string().trim().min(2, { message: "Nome deve ter pelo menos 2 caracteres" }).max(100, { message: "Nome muito longo" }),
+  email: z.string().trim().email({ message: "Email inválido" }).max(255, { message: "Email muito longo" }),
+  password: z.string().min(6, { message: "Palavra-passe deve ter pelo menos 6 caracteres" }).max(72, { message: "Palavra-passe muito longa" }),
+});
 
 const Registar = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signUp, session, loading: authLoading } = useAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (session) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [session, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Mock register - redireciona para dashboard
+    setErrors({});
+
+    // Validate input
+    const validation = registerSchema.safeParse({ name, email, password });
+    if (!validation.success) {
+      const fieldErrors: { name?: string; email?: string; password?: string } = {};
+      validation.error.errors.forEach((err) => {
+        if (err.path[0] === "name") fieldErrors.name = err.message;
+        if (err.path[0] === "email") fieldErrors.email = err.message;
+        if (err.path[0] === "password") fieldErrors.password = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await signUp(email, password, name);
+    setLoading(false);
+
+    if (error) {
+      let message = "Erro ao criar conta";
+      if (error.message.includes("User already registered")) {
+        message = "Este email já está registado. Tenta iniciar sessão.";
+      } else if (error.message.includes("Password should be")) {
+        message = "A palavra-passe não cumpre os requisitos de segurança";
+      }
+      toast({
+        title: "Erro",
+        description: message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     toast({
       title: "Conta criada com sucesso",
       description: "Bem-vindo à Carteira PT!",
     });
-    
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 500);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center p-4">
@@ -59,7 +113,12 @@ const Registar = () => {
                 placeholder="O teu nome"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                className={errors.name ? "border-destructive" : ""}
+                disabled={loading}
               />
+              {errors.name && (
+                <p className="text-xs text-destructive">{errors.name}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -70,7 +129,12 @@ const Registar = () => {
                 placeholder="exemplo@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className={errors.email ? "border-destructive" : ""}
+                disabled={loading}
               />
+              {errors.email && (
+                <p className="text-xs text-destructive">{errors.email}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -81,11 +145,23 @@ const Registar = () => {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className={errors.password ? "border-destructive" : ""}
+                disabled={loading}
               />
+              {errors.password && (
+                <p className="text-xs text-destructive">{errors.password}</p>
+              )}
             </div>
 
-            <Button variant="hero" size="lg" className="w-full" type="submit">
-              Criar Conta Grátis
+            <Button variant="hero" size="lg" className="w-full" type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  A criar conta...
+                </>
+              ) : (
+                "Criar Conta Grátis"
+              )}
             </Button>
           </form>
 
