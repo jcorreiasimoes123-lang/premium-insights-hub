@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,34 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: "Não autorizado. Por favor, inicia sessão." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    
+    if (userError || !user) {
+      console.error("Auth error:", userError);
+      return new Response(
+        JSON.stringify({ error: "Sessão inválida. Por favor, inicia sessão novamente." }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = user.id;
+    console.log(`Authenticated user: ${userId}`);
+
     const formData = await req.formData();
     const file = formData.get("file") as File;
 
@@ -22,7 +51,26 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Recebido ficheiro: ${file.name}, tamanho: ${file.size} bytes, tipo: ${file.type}`);
+    // Validate file name
+    const fileName = file.name;
+    if (!fileName || fileName.length > 255) {
+      return new Response(
+        JSON.stringify({ error: "Nome de ficheiro inválido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate file extension
+    const allowedExtensions = ['.pdf', '.csv', '.txt'];
+    const fileExtension = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
+    if (!allowedExtensions.includes(fileExtension)) {
+      return new Response(
+        JSON.stringify({ error: "Tipo de ficheiro não suportado. Use PDF, CSV ou TXT." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Recebido ficheiro: ${fileName}, tamanho: ${file.size} bytes, tipo: ${file.type}`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
@@ -51,11 +99,11 @@ serve(async (req) => {
     // Determine MIME type
     let mimeType = file.type;
     if (!mimeType || mimeType === "application/octet-stream") {
-      if (file.name.toLowerCase().endsWith(".pdf")) {
+      if (fileExtension === ".pdf") {
         mimeType = "application/pdf";
-      } else if (file.name.toLowerCase().endsWith(".csv")) {
+      } else if (fileExtension === ".csv") {
         mimeType = "text/csv";
-      } else if (file.name.toLowerCase().endsWith(".txt")) {
+      } else if (fileExtension === ".txt") {
         mimeType = "text/plain";
       }
     }
@@ -260,7 +308,7 @@ Se não encontrares transações claras, responde apenas: []`
     const expenseCount = transactions.filter((t: any) => t.type === "expense").length;
     const incomeCount = transactions.filter((t: any) => t.type === "income").length;
     
-    console.log(`Extraídas ${transactions.length} transações válidas (${expenseCount} despesas, ${incomeCount} receitas)`);
+    console.log(`User ${userId} - Extraídas ${transactions.length} transações válidas (${expenseCount} despesas, ${incomeCount} receitas)`);
 
     return new Response(
       JSON.stringify({ 
