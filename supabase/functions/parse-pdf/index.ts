@@ -14,27 +14,42 @@ serve(async (req) => {
 
   try {
     // Authentication check
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
         JSON.stringify({ error: "Não autorizado. Por favor, inicia sessão." }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
       );
     }
 
+    // Extract raw JWT (supabase-js auth.getUser() needs the token, not the session)
+    const token = authHeader.replace("Bearer ", "").trim();
+
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
     );
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    
+    // IMPORTANT: pass token to avoid AuthSessionMissingError in Edge runtime
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseClient.auth.getUser(token);
+
     if (userError || !user) {
       console.error("Auth error:", userError);
       return new Response(
-        JSON.stringify({ error: "Sessão inválida. Por favor, inicia sessão novamente." }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: "Sessão inválida. Por favor, inicia sessão novamente.",
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
       );
     }
 
