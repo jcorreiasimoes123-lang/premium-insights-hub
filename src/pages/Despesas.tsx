@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Receipt,
   MoreVertical,
@@ -7,6 +7,7 @@ import {
   Eraser,
   Filter,
   Plus,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,8 @@ import ImportPdfModal from "@/components/ImportPdfModal";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
+import { useExpenses } from "@/hooks/useExpenses";
+import { useIncomes } from "@/hooks/useIncomes";
 import {
   formatCurrency,
   formatDate,
@@ -36,29 +39,24 @@ import {
   type Income,
 } from "@/data/mockData";
 
-const EXPENSES_KEY = "carteira-pt-expenses";
-const INCOMES_KEY = "carteira-pt-incomes";
-
 const Despesas = () => {
   const { toast } = useToast();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const {
+    expenses,
+    loading,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+    clearAllExpenses,
+    importExpenses,
+  } = useExpenses();
+  const { importIncomes } = useIncomes();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>();
   const [deletingExpense, setDeletingExpense] = useState<Expense | undefined>();
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("todas");
-
-  useEffect(() => {
-    const saved = localStorage.getItem(EXPENSES_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setExpenses(parsed.map((e: any) => ({ ...e, date: new Date(e.date) })));
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(EXPENSES_KEY, JSON.stringify(expenses));
-  }, [expenses]);
 
   const categories = useMemo(() => {
     const cats = [...new Set(expenses.map((e) => e.category))];
@@ -98,93 +96,81 @@ const Despesas = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveExpense = (data: Omit<Expense, "id">) => {
+  const handleSaveExpense = async (data: Omit<Expense, "id">) => {
     if (editingExpense) {
-      setExpenses((prev) =>
-        prev.map((e) =>
-          e.id === editingExpense.id ? { ...data, id: e.id } : e
-        )
-      );
-      toast({
-        title: "Despesa atualizada",
-        description: `"${data.description}" foi atualizada com sucesso.`,
-      });
+      const success = await updateExpense(editingExpense.id, data);
+      if (success) {
+        toast({
+          title: "Despesa atualizada",
+          description: `"${data.description}" foi atualizada com sucesso.`,
+        });
+      }
     } else {
-      const newExpense: Expense = {
-        ...data,
-        id: `exp-${Date.now()}`,
-      };
-      setExpenses((prev) => [...prev, newExpense]);
-      toast({
-        title: "Despesa adicionada",
-        description: `"${data.description}" foi adicionada.`,
-      });
+      const newExpense = await addExpense(data);
+      if (newExpense) {
+        toast({
+          title: "Despesa adicionada",
+          description: `"${data.description}" foi adicionada.`,
+        });
+      }
     }
     setEditingExpense(undefined);
   };
 
-  const handleDeleteExpense = () => {
+  const handleDeleteExpense = async () => {
     if (!deletingExpense) return;
-    setExpenses((prev) => prev.filter((e) => e.id !== deletingExpense.id));
-    toast({
-      title: "Despesa eliminada",
-      description: `"${deletingExpense.description}" foi eliminada.`,
-      variant: "destructive",
-    });
+    const success = await deleteExpense(deletingExpense.id);
+    if (success) {
+      toast({
+        title: "Despesa eliminada",
+        description: `"${deletingExpense.description}" foi eliminada.`,
+        variant: "destructive",
+      });
+    }
     setDeletingExpense(undefined);
   };
 
-  const handleClearAllExpenses = () => {
-    setExpenses([]);
-    toast({
-      title: "Despesas limpas",
-      description: "Todas as despesas foram eliminadas.",
-      variant: "destructive",
-    });
+  const handleClearAllExpenses = async () => {
+    const success = await clearAllExpenses();
+    if (success) {
+      toast({
+        title: "Despesas limpas",
+        description: "Todas as despesas foram eliminadas.",
+        variant: "destructive",
+      });
+    }
     setIsClearAllDialogOpen(false);
   };
 
-  const handleImportExpenses = (
+  const handleImportExpenses = async (
     newExpenses: Omit<Expense, "id">[],
     newIncomes: Omit<Income, "id">[]
   ) => {
-    if (newExpenses.length > 0) {
-      const expensesWithIds: Expense[] = newExpenses.map((exp, index) => ({
-        ...exp,
-        id: `exp-import-${Date.now()}-${index}`,
-      }));
-      setExpenses((prev) => [...prev, ...expensesWithIds]);
-    }
-
-    if (newIncomes.length > 0) {
-      const savedIncomes = localStorage.getItem(INCOMES_KEY);
-      const existingIncomes: Income[] = savedIncomes
-        ? JSON.parse(savedIncomes).map((i: any) => ({
-            ...i,
-            date: new Date(i.date),
-          }))
-        : [];
-
-      const incomesWithIds: Income[] = newIncomes.map((inc, index) => ({
-        ...inc,
-        id: `inc-import-${Date.now()}-${index}`,
-      }));
-
-      localStorage.setItem(
-        INCOMES_KEY,
-        JSON.stringify([...existingIncomes, ...incomesWithIds])
-      );
-    }
+    const expensesCount = await importExpenses(newExpenses);
+    const incomesCount = await importIncomes(newIncomes);
 
     const parts = [];
-    if (newExpenses.length > 0) parts.push(`${newExpenses.length} despesa(s)`);
-    if (newIncomes.length > 0) parts.push(`${newIncomes.length} receita(s)`);
+    if (expensesCount > 0) parts.push(`${expensesCount} despesa(s)`);
+    if (incomesCount > 0) parts.push(`${incomesCount} receita(s)`);
 
-    toast({
-      title: "Transações importadas",
-      description: `${parts.join(" e ")} importada(s) com sucesso.`,
-    });
+    if (parts.length > 0) {
+      toast({
+        title: "Transações importadas",
+        description: `${parts.join(" e ")} importada(s) com sucesso.`,
+      });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader />
+        <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
