@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, incomeCategories } from "@/data/mockData";
 import { getStoredCategories } from "@/hooks/useExpenseCategories";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Expense, Income } from "@/data/mockData";
 
 interface ParsedTransaction {
@@ -46,6 +47,7 @@ interface DiagnosticInfo {
 
 const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
   const { toast } = useToast();
+  const { session } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,6 +60,12 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Check if user is authenticated
+    if (!session?.access_token) {
+      setError("Sessão expirada. Por favor, inicia sessão novamente.");
+      return;
+    }
 
     // Validate file type
     const validTypes = [
@@ -94,7 +102,7 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
           body: formData,
         }
