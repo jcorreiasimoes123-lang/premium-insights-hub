@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, incomeCategories } from "@/data/mockData";
 import { getStoredCategories } from "@/hooks/useExpenseCategories";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import type { Expense, Income } from "@/data/mockData";
 
 interface ParsedTransaction {
@@ -61,8 +62,20 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check if user is authenticated
-    if (!session?.access_token) {
+    // Garantir token válido (a chamada via fetch não força refresh automático do token)
+    let accessToken = session?.access_token;
+
+    if (!accessToken) {
+      const { data } = await supabase.auth.getSession();
+      accessToken = data.session?.access_token ?? undefined;
+    }
+
+    if (!accessToken) {
+      const { data } = await supabase.auth.refreshSession();
+      accessToken = data.session?.access_token ?? undefined;
+    }
+
+    if (!accessToken) {
       setError("Sessão expirada. Por favor, inicia sessão novamente.");
       return;
     }
@@ -102,7 +115,8 @@ const ImportPdfModal = ({ onImport }: ImportPdfModalProps) => {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
           body: formData,
         }
