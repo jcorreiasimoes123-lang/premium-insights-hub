@@ -10,8 +10,9 @@ export interface Expense {
   id: string;
   description: string;
   amount: number;
-  category: string; // Agora suporta categorias personalizadas
+  category: string;
   date: Date;
+  notes?: string;
 }
 
 export interface Income {
@@ -20,6 +21,7 @@ export interface Income {
   amount: number;
   category: string;
   date: Date;
+  notes?: string;
 }
 
 export interface Subscription {
