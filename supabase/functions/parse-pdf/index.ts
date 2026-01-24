@@ -125,7 +125,7 @@ serve(async (req) => {
 
     console.log(`Enviando ficheiro para AI com tipo: ${mimeType}`);
 
-    // Use Gemini with vision capability to read the document directly
+    // Use Claude 4.5 Sonnet with vision capability to read the document directly
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -133,7 +133,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "anthropic/claude-4.5-sonnet",
         messages: [
           {
             role: "system",
